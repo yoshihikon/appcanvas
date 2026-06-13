@@ -79,11 +79,29 @@ CREATE INDEX IF NOT EXISTS idx_messages_session ON chat_messages(session_id);
 // next dev のホットリロードで接続が増殖しないよう globalThis にキャッシュする
 const globalCache = globalThis as unknown as {
   __appcanvasDbCache?: Map<string, { raw: Database.Database; db: ProjectDb }>;
+  __appcanvasMigrated?: Set<string>;
 };
 
 function getCache() {
   globalCache.__appcanvasDbCache ??= new Map();
   return globalCache.__appcanvasDbCache;
+}
+
+function getMigratedSet() {
+  globalCache.__appcanvasMigrated ??= new Set();
+  return globalCache.__appcanvasMigrated;
+}
+
+/**
+ * プロジェクトごとに1度だけマイグレーションを実行する。
+ * 旧ビルドが globalThis にキャッシュした接続でも、新ビルドが最初に
+ * 触れた時点でカラム追加が走るようにする（dev のホットリロード対策）。
+ */
+function ensureMigrated(raw: Database.Database, projectId: string): void {
+  const migrated = getMigratedSet();
+  if (migrated.has(projectId)) return;
+  migrateColumns(raw);
+  migrated.add(projectId);
 }
 
 /**
@@ -112,7 +130,11 @@ function migrateColumns(raw: Database.Database): void {
 export function openProjectDb(projectId: string): ProjectDb {
   const cache = getCache();
   const cached = cache.get(projectId);
-  if (cached) return cached.db;
+  if (cached) {
+    // 旧ビルドがキャッシュした接続でもカラム追加を保証する
+    ensureMigrated(cached.raw, projectId);
+    return cached.db;
+  }
 
   const dbPath = getProjectDbPath(projectId);
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -120,7 +142,7 @@ export function openProjectDb(projectId: string): ProjectDb {
   raw.pragma("journal_mode = WAL");
   raw.pragma("foreign_keys = ON");
   raw.exec(BOOTSTRAP_DDL);
-  migrateColumns(raw);
+  ensureMigrated(raw, projectId);
 
   const db = drizzle(raw, { schema });
   cache.set(projectId, { raw, db });
