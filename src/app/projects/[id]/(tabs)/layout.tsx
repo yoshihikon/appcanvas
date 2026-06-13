@@ -1,21 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject } from "@/lib/db/repositories/projects";
-import { listScreens } from "@/lib/db/repositories/screens";
-import { Canvas } from "@/components/canvas";
 import { ProjectSettingsButton } from "@/components/project-settings-button";
+import { ProjectTabs } from "@/components/project-tabs";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectCanvasPage({
+/**
+ * プロジェクトの3タブ（キャンバス/プレビュー/開発コード）共通のヘッダ。
+ * 画面詳細は (tabs) グループ外なのでこのレイアウトを受けない。
+ */
+export default async function ProjectTabsLayout({
+  children,
   params,
 }: {
+  children: React.ReactNode;
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
   const project = getProject(id);
   if (!project) notFound();
-  const screens = listScreens(id);
 
   return (
     <div className="space-y-6">
@@ -26,14 +30,16 @@ export default async function ProjectCanvasPage({
               プロジェクト一覧
             </Link>
             <span className="mx-1.5">/</span>
-            <span className="text-ink-soft">キャンバス</span>
+            <span className="text-ink-soft">{project.name}</span>
           </nav>
           <h1 className="mt-1 truncate text-2xl font-bold">{project.name}</h1>
         </div>
         <ProjectSettingsButton project={project} />
       </div>
 
-      <Canvas projectId={id} screens={screens} defaultDevice={project.defaultDevice} />
+      <ProjectTabs id={id} />
+
+      {children}
     </div>
   );
 }

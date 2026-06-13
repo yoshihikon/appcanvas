@@ -49,13 +49,35 @@ export type ReviseArgs = ProposeArgs & {
 
 export type GenerateScreenArgs = {
   workspace: string;
-  /** 画面コードの出力先（app/screens/<screenId>/page.tsx） */
-  codePath: string;
   /** プレビュー/キャプチャ用の自己完結HTMLの出力先 */
   previewPath: string;
   screen: ProposedScreen & { id: string };
   context: ProjectContext;
   model: string;
+  agentSessionId?: string;
+  onMessage: (m: AgentMessage) => void;
+  abort?: AbortController;
+};
+
+/** 開発コード生成の対象となる画面（プレビューHTMLと抽出済みコンポーネント付き） */
+export type DevCodeScreen = {
+  id: string;
+  name: string;
+  group: string;
+  device: string;
+  description: string;
+  /** .appcanvas/<id>/snapshot.html の絶対パス（存在すれば） */
+  snapshotPath: string;
+  components: { componentId: string; name: string; type: string }[];
+};
+
+export type GenerateDevCodeArgs = {
+  workspace: string;
+  screens: DevCodeScreen[];
+  context: ProjectContext;
+  model: string;
+  /** 既存の開発コードがあるか（差分追加か新規作成かの判断に使う） */
+  hasExistingCode: boolean;
   agentSessionId?: string;
   onMessage: (m: AgentMessage) => void;
   abort?: AbortController;
@@ -70,4 +92,6 @@ export interface AgentClient {
   revise(args: ReviseArgs): Promise<{ proposal: Proposal; agentSessionId?: string }>;
   /** プレビュー用HTMLを返す（キャプチャ入力に使う） */
   generateScreen(args: GenerateScreenArgs): Promise<{ html: string; agentSessionId?: string }>;
+  /** ワークスペースにNext.js開発コード一式を作成/更新する */
+  generateDevCode(args: GenerateDevCodeArgs): Promise<{ agentSessionId?: string }>;
 }

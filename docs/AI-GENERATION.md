@@ -368,6 +368,25 @@ Claude Code はファイル編集に強いエージェントなので、構成�
 - **スキルの供給元** … workspace に同梱したスキルをプロジェクト設定で選択。
 - **混在グリッドの見せ方** … 初期は混在表示＋デバイスバッジ、フィルタは将来。
 
+## 8.1 追加: タブUIと開発コード生成（実装済み）
+
+プロジェクトを3タブ構成にした（ルートグループ `app/projects/[id]/(tabs)/`、共通レイアウトで
+ヘッダ＋タブ）。画面詳細はタブ外。
+
+- **キャンバス** … 既存。
+- **プレビュー** … 左に画面名（プレビューHTML）一覧、右に `/preview/[id]/[screenId]` の iframe。
+  iframe内で別画面に遷移したら左の選択も追従（同一オリジンの location を読む）。
+- **開発コード** … 左にファイルツリー、右にコード（閲覧専用）。`/api/projects/[id]/code/tree`・
+  `/code/file`（パストラバーサル対策あり、`.appcanvas`/空ディレクトリは除外）。
+
+生成フローの変更:
+
+- **画面生成はHTMLのみ**にした（`.appcanvas/<id>/preview.html` のみ。page.tsx は書かない）。
+- **開発コードは別ボタンで生成**（`POST /api/projects/[id]/code-generations`）。プロジェクト全画面の
+  プレビューHTML＋コンポーネント情報を元に Next.js コードを workspace に作成。2回目以降は既存コードを
+  読み込み差分追加。`generation_runs.kind`（`screens`|`code`）で区別し、ストリーム/中断は既存の
+  `/generations/[runId]/stream`・`/cancel` を流用。
+
 ## 9. 実装順序
 
 1. **基盤**（本コミット〜）: データモデル追加（projects に skills /

@@ -1,20 +1,27 @@
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { getProject } from "@/lib/db/repositories/projects";
-import { createScreen, updateScreen } from "@/lib/db/repositories/screens";
+import {
+  createScreen,
+  listScreens,
+  updateScreen,
+} from "@/lib/db/repositories/screens";
+import { listComponents } from "@/lib/db/repositories/screen-components";
 import {
   addMessage,
   getRun,
   updateRun,
 } from "@/lib/db/repositories/generation";
 import { captureAndStore } from "@/lib/capture/store";
-import { getWorkspaceDir } from "@/lib/storage/paths";
+import { getSnapshotFile, getWorkspaceDir } from "@/lib/storage/paths";
+import { hasDevCode } from "@/lib/workspace/files";
 import { readSettings } from "@/lib/storage/settings";
 import { parseSkills } from "@/lib/agent/skills";
 import { getAgent } from "@/lib/agent/client";
 import type { DeviceType } from "@/lib/device";
 import type {
   AgentMessage,
+  DevCodeScreen,
   ProjectContext,
   Proposal,
 } from "./types";
@@ -217,7 +224,6 @@ export function approveRun(
         try {
           const { html, agentSessionId } = await agent.generateScreen({
             workspace: ws,
-            codePath: path.join(ws, "app", "screens", screen.id, "page.tsx"),
             previewPath: path.join(ws, ".appcanvas", screen.id, "preview.html"),
             screen: { ...proposed, id: screen.id },
             context,
@@ -265,6 +271,67 @@ export function approveRun(
       finish(runId);
     }
   })();
+}
+
+/** 開発コード生成を開始（プロジェクト全画面が対象・非同期実行） */
+export function startCodeGeneration(projectId: string, runId: string): void {
+  const c = beginOp(runId);
+  updateRun(projectId, runId, { status: "generating" });
+  emit(projectId, runId, { type: "phase", status: "generating" });
+  void (async () => {
+    try {
+      const context = buildContext(projectId);
+      const run = getRun(projectId, runId);
+      if (!context || !run) throw new Error("run not found");
+
+      const ws = getWorkspaceDir(projectId);
+      const screens = collectDevCodeScreens(projectId);
+      if (screens.length === 0) {
+        throw new Error("生成済みの画面がありません。先に画面を生成してください。");
+      }
+
+      const { agentSessionId } = await getAgent().generateDevCode({
+        workspace: ws,
+        screens,
+        context,
+        model: readSettings().model,
+        hasExistingCode: hasDevCode(projectId),
+        agentSessionId: run.agentSessionId ?? undefined,
+        onMessage: onMessage(projectId, runId),
+        abort: c.abort,
+      });
+
+      if (c.abort.signal.aborted) {
+        updateRun(projectId, runId, { agentSessionId });
+        return;
+      }
+      updateRun(projectId, runId, { agentSessionId, status: "done" });
+      emit(projectId, runId, { type: "done" });
+    } catch (err) {
+      handleError(projectId, runId, err);
+    } finally {
+      finish(runId);
+    }
+  })();
+}
+
+/** プロジェクトの生成済み画面を開発コード生成用にまとめる */
+function collectDevCodeScreens(projectId: string): DevCodeScreen[] {
+  return listScreens(projectId)
+    .filter((s) => s.status === "generated")
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      group: s.groupName,
+      device: s.device,
+      description: s.description,
+      snapshotPath: getSnapshotFile(projectId, s.id),
+      components: listComponents(projectId, s.id).map((c) => ({
+        componentId: c.componentId,
+        name: c.name,
+        type: c.type,
+      })),
+    }));
 }
 
 export function cancelRun(projectId: string, runId: string): void {

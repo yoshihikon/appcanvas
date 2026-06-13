@@ -11,15 +11,21 @@ import type { AgentMessage, Proposal } from "@/lib/generation/types";
 
 export function createRun(
   projectId: string,
-  input: { input: string; defaultDevice: string },
+  input: {
+    input: string;
+    defaultDevice: string;
+    kind?: "screens" | "code";
+    status?: GenerationStatus;
+  },
 ): GenerationRun {
   const db = openProjectDb(projectId);
   const now = new Date().toISOString();
   const run: GenerationRun = {
     id: crypto.randomUUID(),
     projectId,
+    kind: input.kind ?? "screens",
     agentSessionId: null,
-    status: "proposing",
+    status: input.status ?? "proposing",
     input: input.input,
     defaultDevice: input.defaultDevice,
     proposal: null,

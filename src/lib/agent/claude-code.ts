@@ -2,6 +2,7 @@ import fs from "node:fs";
 import type {
   AgentClient,
   AgentMessage,
+  GenerateDevCodeArgs,
   GenerateScreenArgs,
   Proposal,
   ProposeArgs,
@@ -56,15 +57,16 @@ ${args.instruction}`;
   async generateScreen(
     args: GenerateScreenArgs,
   ): Promise<{ html: string; agentSessionId?: string }> {
-    const prompt = `次の画面を作成してください。
+    const prompt = `次の画面のデザイン検討用プレビューを作成してください。
 
 - 画面名: ${args.screen.name}
 - 役割: ${args.screen.description}
 - デバイス: ${args.screen.device === "mobile" ? "スマホ(幅390px想定)" : "PC(幅1440px想定)"}
 
-手順:
-1. Next.js + Tailwind のコードを ${args.codePath} に作成する。主要要素には data-cid 属性を付与する（CLAUDE.mdの規約に従う）。
-2. プレビュー/サムネ用に、外部依存のない自己完結HTML（インラインCSS）を ${args.previewPath} に作成する。見た目は1の画面に合わせ、data-cid も同じものを付与する。
+要件:
+- 外部依存のない自己完結HTML（インラインCSS）を ${args.previewPath} に作成する。
+- 主要要素には data-cid 属性を付与する（CLAUDE.mdの規約に従う）。
+- この工程ではNext.jsの開発コード（page.tsx等）は作らない。プレビューHTMLのみ。
 
 完了したら終了してください。`;
     const { agentSessionId } = await runQuery({
@@ -79,6 +81,45 @@ ${args.instruction}`;
       throw new Error("プレビューHTMLが生成されませんでした");
     }
     return { html: fs.readFileSync(args.previewPath, "utf-8"), agentSessionId };
+  }
+
+  async generateDevCode(
+    args: GenerateDevCodeArgs,
+  ): Promise<{ agentSessionId?: string }> {
+    const screenList = args.screens
+      .map(
+        (s) =>
+          `- ${s.name}（${s.device}, グループ: ${s.group || "未分類"}）: ${s.description}\n  プレビューHTML: ${s.snapshotPath}\n  コンポーネント: ${s.components.map((c) => c.componentId).join(", ") || "（なし）"}`,
+      )
+      .join("\n");
+    const prompt = `このワークスペースに、各画面の開発用 Next.js コード（App Router + Tailwind）を作成してください。
+
+${
+  args.hasExistingCode
+    ? "既存の開発コードがあります。まず既存ファイルを読み、構成・共有コンポーネント・命名を踏まえて、不足している画面を追加・更新してください（全面的に作り直さない）。"
+    : "新規に Next.js プロジェクト構成（app/ ディレクトリ、共有コンポーネントは components/）でコードを作成してください。"
+}
+
+各画面のプレビューHTMLを参照し、実装の見た目・構造の根拠にしてください。data-cid のコンポーネントは再利用可能な部品として切り出すことを検討してください。
+
+対象画面:
+${screenList}
+
+方針:
+- App Router 構成（app/<route>/page.tsx）。画面ごとに分かりやすいルートを切る。
+- 繰り返し使う要素は components/ に共有コンポーネントとして実装し、各画面から使う。
+- .appcanvas/ 配下は AppCanvas 管理の生成物なので編集しない。
+- CLAUDE.md のプロジェクト前提・デザインシステム・適用スキルに従う。
+
+完了したら終了してください。`;
+    return runQuery({
+      prompt,
+      cwd: args.workspace,
+      model: args.model,
+      resume: args.agentSessionId,
+      onMessage: args.onMessage,
+      abort: args.abort,
+    });
   }
 }
 

@@ -59,15 +59,24 @@ ${skillsBlock}
 
 ${project.designSystem || "（未設定）"}
 
+## 作業の2段階
+
+1. **画面検討（プレビュー）**: まず各画面のデザインを、外部依存のない自己完結HTMLとして
+   \`.appcanvas/<screenId>/preview.html\` に作る。この段階では開発コード（page.tsx等）は作らない。
+2. **開発コード生成**: 別途「開発コードを生成」が実行されたときに、各画面のプレビューHTMLを根拠に
+   Next.js（App Router）の開発コードを作成・更新する。
+
 ## 作業ルール
 
-- 画面コードは \`app/screens/<screenId>/page.tsx\` に置く（1画面=1ファイルを基本とする）
 - スタイリングは Tailwind CSS を使う
 - 画面内の主要な要素（フォーム・ボタン・テーブル・ナビゲーション等）には
   必ず \`data-cid="<コンポーネントID>"\` 属性を付与する。IDは画面内で一意の
   英数字ケバブケース（例: \`login-form\`, \`submit-button\`）とする
-- 複数画面で共有するコンポーネントは \`components/\` に置く
-- \`.appcanvas/\` 配下は AppCanvas が生成する派生物（サムネイル等）なので編集しない
+- 開発コードは App Router 構成（\`app/<route>/page.tsx\`）で作る。複数画面で共有する
+  コンポーネントは \`components/\` に置いて再利用する
+- 既存の開発コードがある場合は読み込み、構成・命名・共有コンポーネントを踏まえて差分追加する
+  （全面的に作り直さない）
+- \`.appcanvas/\` 配下は AppCanvas が生成する派生物（プレビュー・サムネイル等）なので編集しない
 `;
   fs.writeFileSync(path.join(ws, "CLAUDE.md"), content);
 }

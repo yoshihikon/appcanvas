@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 CREATE TABLE IF NOT EXISTS generation_runs (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'screens',
   agent_session_id TEXT,
   status TEXT NOT NULL DEFAULT 'proposing',
   input TEXT NOT NULL DEFAULT '',
@@ -137,6 +138,7 @@ function migrateColumns(raw: Database.Database): void {
     { table: "projects", column: "default_device", ddl: "TEXT NOT NULL DEFAULT 'desktop'" },
     { table: "screens", column: "device", ddl: "TEXT NOT NULL DEFAULT 'desktop'" },
     { table: "screens", column: "generation_run_id", ddl: "TEXT" },
+    { table: "generation_runs", column: "kind", ddl: "TEXT NOT NULL DEFAULT 'screens'" },
   ];
   for (const { table, column, ddl } of additions) {
     const cols = raw

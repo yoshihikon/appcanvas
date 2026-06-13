@@ -112,6 +112,8 @@ export const generationRuns = sqliteTable("generation_runs", {
   projectId: text("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
+  /** 'screens'=画面生成, 'code'=開発コード生成 */
+  kind: text("kind").$type<"screens" | "code">().notNull().default("screens"),
   /** Claude Code のセッションID（resume用） */
   agentSessionId: text("agent_session_id"),
   status: text("status").$type<GenerationStatus>().notNull().default("proposing"),

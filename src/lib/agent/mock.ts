@@ -1,5 +1,8 @@
+import fs from "node:fs";
+import path from "node:path";
 import type {
   AgentClient,
+  GenerateDevCodeArgs,
   GenerateScreenArgs,
   Proposal,
   ProposeArgs,
@@ -52,12 +55,68 @@ export class MockAgent implements AgentClient {
     args.onMessage({
       kind: "tool",
       tool: "Write",
-      detail: `app/screens/${args.screen.id}/page.tsx`,
+      detail: `.appcanvas/${args.screen.id}/preview.html`,
     });
     await sleep(400);
-    args.onMessage({ kind: "text", text: `「${args.screen.name}」を生成しました。` });
+    args.onMessage({ kind: "text", text: `「${args.screen.name}」のプレビューを生成しました。` });
     return { html: mockScreenHtml(args) };
   }
+
+  async generateDevCode(args: GenerateDevCodeArgs): Promise<{ agentSessionId?: string }> {
+    args.onMessage({
+      kind: "text",
+      text: args.hasExistingCode
+        ? "既存の開発コードを確認し、不足分を追加します。"
+        : "Next.js の開発コードを新規作成します。",
+    });
+    await sleep(300);
+
+    const write = (rel: string, content: string) => {
+      const abs = path.join(args.workspace, rel);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, content);
+      args.onMessage({ kind: "tool", tool: "Write", detail: rel });
+    };
+
+    if (!args.hasExistingCode) {
+      write(
+        "app/layout.tsx",
+        `export default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang="ja">\n      <body>{children}</body>\n    </html>\n  );\n}\n`,
+      );
+      write(
+        "components/Button.tsx",
+        `export function Button({ children }: { children: React.ReactNode }) {\n  return (\n    <button className="rounded bg-blue-600 px-4 py-2 font-medium text-white">\n      {children}\n    </button>\n  );\n}\n`,
+      );
+    }
+
+    for (const screen of args.screens) {
+      if (args.abort?.signal.aborted) break;
+      await sleep(250);
+      const slug = slugify(screen.name) || screen.id.slice(0, 8);
+      write(
+        `app/${slug}/page.tsx`,
+        `import { Button } from "@/components/Button";\n\n// ${screen.name}（${screen.device}）\n// ${screen.description}\nexport default function ${pascal(slug)}Page() {\n  return (\n    <main className="mx-auto max-w-3xl p-6">\n      <h1 className="text-2xl font-bold">${screen.name}</h1>\n      <p className="mt-2 text-gray-600">${screen.description}</p>\n      <div className="mt-4">\n        <Button>操作</Button>\n      </div>\n    </main>\n  );\n}\n`,
+      );
+      args.onMessage({ kind: "text", text: `「${screen.name}」のコードを作成しました。` });
+    }
+    return {};
+  }
+}
+
+function slugify(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function pascal(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join("") || "Screen";
 }
 
 function buildProposal(input: string, device: "desktop" | "mobile"): Proposal {
