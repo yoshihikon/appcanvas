@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject } from "@/lib/db/repositories/projects";
 import { getScreen, listScreens } from "@/lib/db/repositories/screens";
+import { listComponents } from "@/lib/db/repositories/screen-components";
+import { deviceAspectClass, deviceLabel } from "@/lib/device";
 import { StatusBadge } from "@/components/status-badge";
 import { ScreenMetaForm } from "@/components/screen-meta-form";
 
@@ -20,6 +22,7 @@ export default async function ScreenDetailPage({
 
   const number =
     listScreens(id).findIndex((s) => s.id === screenId) + 1;
+  const components = listComponents(id, screenId);
 
   return (
     <div className="space-y-6">
@@ -46,22 +49,23 @@ export default async function ScreenDetailPage({
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
-        {/* プレビュー（レンダリングとキャプチャはM2で実装） */}
         <section className="overflow-hidden rounded-lg border border-line bg-surface">
           <div className="flex items-center justify-between border-b border-line px-4 py-2">
             <span className="font-mono text-xs tracking-[0.2em] text-ink-faint">
               PREVIEW
             </span>
+            <span className="font-mono text-[10px] tracking-wider text-ink-faint">
+              {deviceLabel(screen.device)}
+            </span>
           </div>
-          <div className="canvas-grid flex aspect-[4/3] items-center justify-center bg-paper/60">
-            <div className="text-center">
-              <p className="font-mono text-xs tracking-[0.2em] text-ink-faint">
-                NOT RENDERED
-              </p>
-              <p className="mt-2 max-w-xs text-sm text-ink-soft">
-                画面コードのプレビュー表示はまだ実装されていません（M2で対応予定）
-              </p>
-            </div>
+          <div className="bg-paper/60 p-4">
+            <iframe
+              title={`${screen.name} のプレビュー`}
+              src={`/preview/${id}/${screenId}`}
+              className={`mx-auto w-full rounded border border-line bg-surface ${
+                screen.device === "mobile" ? "max-w-[390px]" : ""
+              } ${deviceAspectClass(screen.device)}`}
+            />
           </div>
         </section>
 
@@ -90,6 +94,39 @@ export default async function ScreenDetailPage({
             </div>
             <div className="p-4">
               <ScreenMetaForm projectId={id} screen={screen} />
+            </div>
+          </section>
+
+          {/* 本開発で使うコンポーネント一覧（data-cid から抽出） */}
+          <section className="rounded-lg border border-line bg-surface">
+            <div className="border-b border-line px-4 py-2">
+              <span className="font-mono text-xs tracking-[0.2em] text-ink-faint">
+                COMPONENTS
+              </span>
+            </div>
+            <div className="p-4">
+              {components.length === 0 ? (
+                <p className="text-sm text-ink-soft">
+                  生成・キャプチャ後にコンポーネントが抽出されます。
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {components.map((c) => (
+                    <li
+                      key={c.id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <code className="rounded bg-paper px-1.5 py-0.5 font-mono text-xs">
+                        {c.componentId}
+                      </code>
+                      <span className="text-ink-soft">{c.name}</span>
+                      <span className="ml-auto font-mono text-[10px] tracking-wider text-ink-faint">
+                        {c.type}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </section>
         </div>

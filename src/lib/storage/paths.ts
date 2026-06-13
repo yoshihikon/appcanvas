@@ -37,6 +37,19 @@ export function getWorkspaceDir(projectId: string): string {
   return path.join(getProjectDir(projectId), "workspace");
 }
 
+/** 画面ごとの派生物（サムネ・静的HTML）の保存ディレクトリ */
+export function getScreenArtifactDir(projectId: string, screenId: string): string {
+  return path.join(getWorkspaceDir(projectId), ".appcanvas", screenId);
+}
+
+export function getThumbnailFile(projectId: string, screenId: string): string {
+  return path.join(getScreenArtifactDir(projectId, screenId), "thumb.png");
+}
+
+export function getSnapshotFile(projectId: string, screenId: string): string {
+  return path.join(getScreenArtifactDir(projectId, screenId), "snapshot.html");
+}
+
 export function getRegistryPath(): string {
   return path.join(getDataDir(), "registry.json");
 }
