@@ -37,7 +37,7 @@ export type ProposeArgs = {
   context: ProjectContext;
   model: string;
   onMessage: (m: AgentMessage) => void;
-  signal?: AbortSignal;
+  abort?: AbortController;
 };
 
 export type ReviseArgs = ProposeArgs & {
@@ -58,7 +58,7 @@ export type GenerateScreenArgs = {
   model: string;
   agentSessionId?: string;
   onMessage: (m: AgentMessage) => void;
-  signal?: AbortSignal;
+  abort?: AbortController;
 };
 
 /**

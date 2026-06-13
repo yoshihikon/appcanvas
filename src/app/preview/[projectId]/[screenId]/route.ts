@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import { getSnapshotFile } from "@/lib/storage/paths";
 
+export const dynamic = "force-dynamic";
+
 type RouteContext = { params: Promise<{ projectId: string; screenId: string }> };
 
 /**
@@ -16,7 +18,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
     : PLACEHOLDER;
 
   return new Response(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      // 再生成を即時反映させるためキャッシュしない
+      "Cache-Control": "no-store",
+    },
   });
 }
 

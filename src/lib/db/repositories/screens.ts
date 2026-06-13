@@ -13,6 +13,17 @@ export function listScreens(projectId: string): Screen[] {
     .toSorted((a, b) => a.sortOrder - b.sortOrder);
 }
 
+/** 指定の生成ランで作られた画面を作成順に返す（進捗の復元に使う） */
+export function listScreensByRun(projectId: string, runId: string): Screen[] {
+  const db = openProjectDb(projectId);
+  return db
+    .select()
+    .from(screens)
+    .where(eq(screens.generationRunId, runId))
+    .all()
+    .toSorted((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
 export function getScreen(projectId: string, screenId: string): Screen | null {
   const db = openProjectDb(projectId);
   const row = db

@@ -3,7 +3,10 @@ import {
   listMessages,
   parseProposal,
 } from "@/lib/db/repositories/generation";
+import { listScreensByRun } from "@/lib/db/repositories/screens";
 import { isActive, subscribe, type GenEvent } from "@/lib/generation/orchestrator";
+
+export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string; runId: string }> };
 
@@ -24,7 +27,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
 
-      // 初期スナップショット（再接続時の取りこぼし防止）
+      // 初期スナップショット（再接続時の取りこぼし防止）。
+      // このランで作られた画面の状態も含め、進捗を復元できるようにする。
       send({
         type: "snapshot",
         status: run.status,
@@ -32,6 +36,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
         messages: listMessages(id, runId).map((m) => ({
           role: m.role,
           message: JSON.parse(m.content),
+        })),
+        screens: listScreensByRun(id, runId).map((s) => ({
+          screenId: s.id,
+          name: s.name,
+          status: s.status,
         })),
       });
 
@@ -51,6 +60,14 @@ export async function GET(_request: Request, { params }: RouteContext) {
           controller.close();
         }
       });
+
+      // スナップショットと subscribe の間に終了していた場合の取りこぼし対策
+      const fresh = getRun(id, runId);
+      if (fresh && TERMINAL.has(fresh.status) && !isActive(runId)) {
+        cleanup();
+        controller.close();
+        return;
+      }
 
       // 接続維持のためのハートビート
       const heartbeat = setInterval(() => {

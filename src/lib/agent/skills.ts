@@ -44,6 +44,15 @@ export function sanitizeSkills(value: unknown): string[] {
   return [...seen];
 }
 
+/** DBに保存されたJSON文字列をスキルID配列にパースする（壊れていれば空） */
+export function parseSkills(value: string): string[] {
+  try {
+    return sanitizeSkills(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}
+
 export function skillLabel(id: string): string {
   return AVAILABLE_SKILLS.find((s) => s.id === id)?.label ?? id;
 }

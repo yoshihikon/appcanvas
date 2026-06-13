@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/storage/paths";
 import type { Project } from "@/lib/db/schema";
-import { sanitizeSkills, skillLabel } from "@/lib/agent/skills";
+import { parseSkills, skillLabel } from "@/lib/agent/skills";
 import { deviceLabel } from "@/lib/device";
 
 /**
@@ -22,7 +22,7 @@ export function writeClaudeMd(project: Project): void {
   const ws = getWorkspaceDir(project.id);
   fs.mkdirSync(ws, { recursive: true });
 
-  const skills = sanitizeSkills(safeParseArray(project.skills));
+  const skills = parseSkills(project.skills);
   const skillsBlock =
     skills.length > 0
       ? skills.map((id) => `- ${skillLabel(id)}（${id}）`).join("\n")
@@ -70,12 +70,4 @@ ${project.designSystem || "（未設定）"}
 - \`.appcanvas/\` 配下は AppCanvas が生成する派生物（サムネイル等）なので編集しない
 `;
   fs.writeFileSync(path.join(ws, "CLAUDE.md"), content);
-}
-
-function safeParseArray(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return [];
-  }
 }

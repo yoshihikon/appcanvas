@@ -3,16 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Project } from "@/lib/db/schema";
-import { AVAILABLE_SKILLS, sanitizeSkills } from "@/lib/agent/skills";
+import { AVAILABLE_SKILLS, parseSkills } from "@/lib/agent/skills";
 import { DEVICE_OPTIONS } from "@/lib/device";
-
-function parseSkills(value: string): string[] {
-  try {
-    return sanitizeSkills(JSON.parse(value));
-  } catch {
-    return [];
-  }
-}
 
 export function ProjectSettingsForm({ project }: { project: Project }) {
   const router = useRouter();

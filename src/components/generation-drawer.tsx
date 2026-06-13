@@ -44,6 +44,8 @@ export function GenerationDrawer({
           setStatus(ev.status);
           if (ev.proposal) setProposal(ev.proposal);
           setMessages(ev.messages ?? []);
+          // 再接続時に進捗を復元する
+          if (Array.isArray(ev.screens)) setProgress(ev.screens);
           break;
         case "message":
           setMessages((prev) => [...prev, { role: ev.role, message: ev.message }]);
@@ -55,11 +57,17 @@ export function GenerationDrawer({
           setProposal(ev.proposal);
           break;
         case "screen":
+          // 既存項目はその場で更新し、並び順を保つ
           setProgress((prev) => {
-            const rest = prev.filter((p) => p.screenId !== ev.screenId);
-            return [...rest, { screenId: ev.screenId, name: ev.name, status: ev.status }];
+            const idx = prev.findIndex((p) => p.screenId === ev.screenId);
+            const next = { screenId: ev.screenId, name: ev.name, status: ev.status };
+            if (idx === -1) return [...prev, next];
+            const copy = [...prev];
+            copy[idx] = next;
+            return copy;
           });
-          router.refresh(); // キャンバスのサムネを反映
+          // 画面が完成した時だけキャンバスを更新（生成中は再取得しない）
+          if (ev.status === "generated" || ev.status === "error") router.refresh();
           break;
         case "done":
           setStatus("done");

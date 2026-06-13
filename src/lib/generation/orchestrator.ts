@@ -10,7 +10,7 @@ import {
 import { captureAndStore } from "@/lib/capture/store";
 import { getWorkspaceDir } from "@/lib/storage/paths";
 import { readSettings } from "@/lib/storage/settings";
-import { sanitizeSkills } from "@/lib/agent/skills";
+import { parseSkills } from "@/lib/agent/skills";
 import { getAgent } from "@/lib/agent/client";
 import type { DeviceType } from "@/lib/device";
 import type {
@@ -86,18 +86,12 @@ function finish(runId: string) {
 function buildContext(projectId: string): ProjectContext | null {
   const project = getProject(projectId);
   if (!project) return null;
-  let skills: string[] = [];
-  try {
-    skills = sanitizeSkills(JSON.parse(project.skills));
-  } catch {
-    skills = [];
-  }
   return {
     name: project.name,
     persona: project.persona,
     overview: project.overview,
     designSystem: project.designSystem,
-    skills,
+    skills: parseSkills(project.skills),
     defaultDevice: project.defaultDevice as DeviceType,
   };
 }
@@ -126,7 +120,7 @@ export function startProposing(projectId: string, runId: string): void {
         context,
         model: readSettings().model,
         onMessage: onMessage(projectId, runId),
-        signal: c.abort.signal,
+        abort: c.abort,
       });
 
       updateRun(projectId, runId, { proposal, agentSessionId, status: "reviewing" });
@@ -170,7 +164,7 @@ export function reviseRun(
         current,
         instruction,
         onMessage: onMessage(projectId, runId),
-        signal: c.abort.signal,
+        abort: c.abort,
       });
       updateRun(projectId, runId, { proposal, agentSessionId, status: "reviewing" });
       emit(projectId, runId, { type: "proposal", proposal });
@@ -230,7 +224,7 @@ export function approveRun(
             model: readSettings().model,
             agentSessionId: sessionId,
             onMessage: onMessage(projectId, runId),
-            signal: c.abort.signal,
+            abort: c.abort,
           });
           if (agentSessionId) sessionId = agentSessionId;
           await captureAndStore({ projectId, screenId: screen.id, html, device: screen.device });
@@ -257,6 +251,12 @@ export function approveRun(
         }
       }
 
+      // 中断された場合は cancelRun が status を canceled にしているので
+      // ここで done で上書きしない（done イベントも出さない）
+      if (c.abort.signal.aborted) {
+        updateRun(projectId, runId, { agentSessionId: sessionId });
+        return;
+      }
       updateRun(projectId, runId, { agentSessionId: sessionId, status: "done" });
       emit(projectId, runId, { type: "done" });
     } catch (err) {

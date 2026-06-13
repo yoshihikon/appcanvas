@@ -27,7 +27,7 @@ ${args.input || "（指示なし。前提情報から妥当な画面構成を考
       cwd: args.workspace,
       model: args.model,
       onMessage: args.onMessage,
-      signal: args.signal,
+      abort: args.abort,
     });
     return { proposal: readProposal(args.proposalPath), agentSessionId };
   }
@@ -48,7 +48,7 @@ ${args.instruction}`;
       model: args.model,
       resume: args.agentSessionId,
       onMessage: args.onMessage,
-      signal: args.signal,
+      abort: args.abort,
     });
     return { proposal: readProposal(args.proposalPath), agentSessionId };
   }
@@ -73,7 +73,7 @@ ${args.instruction}`;
       model: args.model,
       resume: args.agentSessionId,
       onMessage: args.onMessage,
-      signal: args.signal,
+      abort: args.abort,
     });
     if (!fs.existsSync(args.previewPath)) {
       throw new Error("プレビューHTMLが生成されませんでした");
@@ -125,7 +125,7 @@ async function runQuery(opts: {
   model: string;
   resume?: string;
   onMessage: (m: AgentMessage) => void;
-  signal?: AbortSignal;
+  abort?: AbortController;
 }): Promise<{ agentSessionId?: string }> {
   // 未インストールでもアプリのビルドが通るよう動的import
   const sdk = (await import("@anthropic-ai/claude-agent-sdk")) as typeof import("@anthropic-ai/claude-agent-sdk");
@@ -137,12 +137,14 @@ async function runQuery(opts: {
       resume: opts.resume,
       allowedTools: ["Read", "Write", "Edit", "Glob", "Grep"],
       permissionMode: "acceptEdits",
+      // 中断時に Claude Code 側の処理も止める
+      abortController: opts.abort,
     },
   });
 
   let agentSessionId: string | undefined;
   for await (const message of response) {
-    if (opts.signal?.aborted) break;
+    if (opts.abort?.signal.aborted) break;
     if (message.type === "assistant") {
       agentSessionId = message.session_id;
       for (const block of message.message.content) {
