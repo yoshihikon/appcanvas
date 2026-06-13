@@ -3,7 +3,7 @@
 /*
  * AppCanvas デザイントークン — 「製図台」モチーフ
  * 画面という設計対象を方眼のマットに整列させる道具、という性格を
- * クールな紙色＋インク＋ドラフティングオレンジ1色で表現する。
+ * クールな紙色＋インク＋ブループリントのブルー1色で表現する。
  * ラベル・ID・ステータスはモノスペースで「仕様書のスタンプ」として扱う。
  */
 @theme {
@@ -13,8 +13,8 @@
   --color-ink-soft: #5f6e7d;
   --color-ink-faint: #93a0ad;
   --color-line: #d7dee5;
-  --color-accent: #e8590c;
-  --color-accent-soft: #fdeee3;
+  --color-accent: #1c64f2;
+  --color-accent-soft: #e7f0fe;
   --color-ok: #2b8a5e;
   --color-ok-soft: #e3f3eb;
   --color-danger: #c92a2a;

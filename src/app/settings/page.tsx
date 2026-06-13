@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { checkAgentHealth } from "@/lib/agent/health";
 import { getDataDir } from "@/lib/storage/paths";
+import { readSettings } from "@/lib/storage/settings";
 import { RefreshButton } from "@/components/refresh-button";
+import { ModelSelector } from "@/components/model-selector";
 
 export const dynamic = "force-dynamic";
 
 export default async function AppSettingsPage() {
   const health = await checkAgentHealth();
   const dataDir = getDataDir();
+  const settings = readSettings();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -69,6 +72,27 @@ export default async function AppSettingsPage() {
         <p className="mt-3 text-xs text-ink-faint">
           認証状態の確認（テスト実行）は Claude Code 連携の実装（M3）で追加されます
         </p>
+      </section>
+
+      <section className="rounded-lg border border-line bg-surface p-4">
+        <h2 className="font-mono text-xs tracking-[0.2em] text-ink-faint">
+          AI MODEL
+        </h2>
+        <p className="mt-2 mb-3 text-sm text-ink-soft">
+          画面の生成・修正でAIに送信するモデルを選びます。コストを抑えたい場合は
+          Haiku や Sonnet を選んでください（高コストな Opus
+          が自動で使われることはありません）。
+        </p>
+        {!health.cliFound && (
+          <p className="mb-3 rounded bg-paper p-3 text-sm text-ink-soft">
+            モデルの選択は Claude Code
+            との連携後に有効になります。先に上の手順で連携してください。
+          </p>
+        )}
+        <ModelSelector
+          initialModel={settings.model}
+          disabled={!health.cliFound}
+        />
       </section>
 
       <section className="rounded-lg border border-line bg-surface p-4">
