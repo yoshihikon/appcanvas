@@ -127,8 +127,7 @@ async function runQuery(opts: {
   onMessage: (m: AgentMessage) => void;
   abort?: AbortController;
 }): Promise<{ agentSessionId?: string }> {
-  // 未インストールでもアプリのビルドが通るよう動的import
-  const sdk = (await import("@anthropic-ai/claude-agent-sdk")) as typeof import("@anthropic-ai/claude-agent-sdk");
+  const sdk = await loadSdk();
   const response = sdk.query({
     prompt: opts.prompt,
     options: {
@@ -146,14 +145,14 @@ async function runQuery(opts: {
   for await (const message of response) {
     if (opts.abort?.signal.aborted) break;
     if (message.type === "assistant") {
-      agentSessionId = message.session_id;
-      for (const block of message.message.content) {
-        if (block.type === "text" && block.text.trim()) {
+      if (message.session_id) agentSessionId = message.session_id;
+      for (const block of message.message?.content ?? []) {
+        if (block.type === "text" && block.text?.trim()) {
           opts.onMessage({ kind: "text", text: block.text });
         } else if (block.type === "tool_use") {
           opts.onMessage({
             kind: "tool",
-            tool: block.name,
+            tool: block.name ?? "tool",
             detail: toolDetail(block.input),
           });
         }
@@ -163,6 +162,38 @@ async function runQuery(opts: {
     }
   }
   return { agentSessionId };
+}
+
+/**
+ * Claude Agent SDK は任意依存。バンドラに静的解決させないため変数指定＋
+ * webpackIgnore で動的importする。未インストールでもアプリのビルド・起動は
+ * 通り、実機のClaude Code経路を使うときだけ必要になる。
+ */
+type SdkBlock = { type: string; text?: string; name?: string; input?: unknown };
+type SdkMessage = {
+  type: string;
+  subtype?: string;
+  session_id?: string;
+  message?: { content: SdkBlock[] };
+};
+type AgentSdk = {
+  query: (params: {
+    prompt: string;
+    options?: Record<string, unknown>;
+  }) => AsyncIterable<SdkMessage>;
+};
+
+async function loadSdk(): Promise<AgentSdk> {
+  const moduleName = "@anthropic-ai/claude-agent-sdk";
+  try {
+    return (await import(/* webpackIgnore: true */ moduleName)) as unknown as AgentSdk;
+  } catch {
+    throw new Error(
+      "Claude Agent SDK (@anthropic-ai/claude-agent-sdk) が見つかりません。" +
+        "AI画面生成には `npm install` でのインストールが必要です。" +
+        "Claude Code なしで動作を確認する場合は APPCANVAS_AGENT=mock を使ってください。",
+    );
+  }
 }
 
 function toolDetail(input: unknown): string {
