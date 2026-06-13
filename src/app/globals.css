@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+/*
+ * AppCanvas デザイントークン — 「製図台」モチーフ
+ * 画面という設計対象を方眼のマットに整列させる道具、という性格を
+ * クールな紙色＋インク＋ドラフティングオレンジ1色で表現する。
+ * ラベル・ID・ステータスはモノスペースで「仕様書のスタンプ」として扱う。
+ */
+@theme {
+  --color-paper: #eef1f4;
+  --color-surface: #ffffff;
+  --color-ink: #1b2733;
+  --color-ink-soft: #5f6e7d;
+  --color-ink-faint: #93a0ad;
+  --color-line: #d7dee5;
+  --color-accent: #e8590c;
+  --color-accent-soft: #fdeee3;
+  --color-ok: #2b8a5e;
+  --color-ok-soft: #e3f3eb;
+  --color-danger: #c92a2a;
+  --color-danger-soft: #fdebeb;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragino Sans",
+    "Noto Sans JP", sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Noto Sans Mono", monospace;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* キャンバスのドット方眼（製図マット） */
+.canvas-grid {
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--color-ink) 16%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
