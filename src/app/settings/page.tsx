@@ -3,7 +3,7 @@ import { checkAgentHealth } from "@/lib/agent/health";
 import { getDataDir } from "@/lib/storage/paths";
 import { readSettings } from "@/lib/storage/settings";
 import { RefreshButton } from "@/components/refresh-button";
-import { ModelSelector } from "@/components/model-selector";
+import { AppSettingsForm } from "@/components/app-settings-form";
 
 export const dynamic = "force-dynamic";
 
@@ -74,42 +74,23 @@ export default async function AppSettingsPage() {
         </p>
       </section>
 
-      <section className="rounded-lg border border-line bg-surface p-4">
-        <h2 className="font-mono text-xs tracking-[0.2em] text-ink-faint">
-          AI MODEL
-        </h2>
-        <p className="mt-2 mb-3 text-sm text-ink-soft">
-          画面の生成・修正でAIに送信するモデルを選びます。コストを抑えたい場合は
-          Haiku や Sonnet を選んでください（高コストな Opus
-          が自動で使われることはありません）。
-        </p>
-        {!health.cliFound && (
-          <p className="mb-3 rounded bg-paper p-3 text-sm text-ink-soft">
-            モデルの選択は Claude Code
-            との連携後に有効になります。先に上の手順で連携してください。
+      <AppSettingsForm initialModel={settings.model} cliFound={health.cliFound}>
+        <section className="rounded-lg border border-line bg-surface p-4">
+          <h2 className="font-mono text-xs tracking-[0.2em] text-ink-faint">
+            STORAGE
+          </h2>
+          <dl className="mt-3 space-y-2 text-sm">
+            <div className="flex items-center gap-3">
+              <dt className="w-28 shrink-0 text-ink-soft">データ保存先</dt>
+              <dd className="break-all font-mono text-xs">{dataDir}</dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-xs text-ink-faint">
+            環境変数 APPCANVAS_DATA_DIR で変更できます（既定値は
+            ~/.appcanvas、Electron版ではアプリのユーザーデータディレクトリ）
           </p>
-        )}
-        <ModelSelector
-          initialModel={settings.model}
-          disabled={!health.cliFound}
-        />
-      </section>
-
-      <section className="rounded-lg border border-line bg-surface p-4">
-        <h2 className="font-mono text-xs tracking-[0.2em] text-ink-faint">
-          STORAGE
-        </h2>
-        <dl className="mt-3 space-y-2 text-sm">
-          <div className="flex items-center gap-3">
-            <dt className="w-28 shrink-0 text-ink-soft">データ保存先</dt>
-            <dd className="break-all font-mono text-xs">{dataDir}</dd>
-          </div>
-        </dl>
-        <p className="mt-3 text-xs text-ink-faint">
-          環境変数 APPCANVAS_DATA_DIR で変更できます（既定値は
-          ~/.appcanvas、Electron版ではアプリのユーザーデータディレクトリ）
-        </p>
-      </section>
+        </section>
+      </AppSettingsForm>
     </div>
   );
 }

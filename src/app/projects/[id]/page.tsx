@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getProject } from "@/lib/db/repositories/projects";
 import { listScreens } from "@/lib/db/repositories/screens";
 import { Canvas } from "@/components/canvas";
+import { ProjectSettingsButton } from "@/components/project-settings-button";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +30,7 @@ export default async function ProjectCanvasPage({
           </nav>
           <h1 className="mt-1 truncate text-2xl font-bold">{project.name}</h1>
         </div>
-        <Link
-          href={`/projects/${id}/settings`}
-          className="shrink-0 rounded border border-line bg-surface px-3 py-2 text-sm text-ink-soft hover:border-ink-faint hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          プロジェクト設定
-        </Link>
+        <ProjectSettingsButton project={project} />
       </div>
 
       <Canvas projectId={id} screens={screens} />

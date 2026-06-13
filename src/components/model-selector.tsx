@@ -1,57 +1,26 @@
 "use client";
 
-import { useState } from "react";
 import { MODEL_OPTIONS, type ModelChoice } from "@/lib/agent/models";
 
 /**
- * AIに送信するモデルの選択。
- * Claude Code 未連携時は無効化する（連携後にのみ選べる）。
+ * AIに送信するモデルの選択（制御コンポーネント）。
+ * 保存は親の「完了」ボタンで行う。Claude Code 未連携時は無効化する。
  */
 export function ModelSelector({
-  initialModel,
+  value,
+  onChange,
   disabled,
 }: {
-  initialModel: ModelChoice;
+  value: ModelChoice;
+  onChange: (model: ModelChoice) => void;
   disabled: boolean;
 }) {
-  const [model, setModel] = useState<ModelChoice>(initialModel);
-  const [saving, setSaving] = useState<ModelChoice | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function select(value: ModelChoice) {
-    if (disabled || value === model || saving) return;
-    const previous = model;
-    setModel(value);
-    setSaving(value);
-    setSaved(false);
-    setError(null);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: value }),
-      });
-      if (!res.ok) {
-        setModel(previous);
-        setError("保存に失敗しました");
-        return;
-      }
-      setSaved(true);
-    } catch {
-      setModel(previous);
-      setError("保存に失敗しました");
-    } finally {
-      setSaving(null);
-    }
-  }
-
   return (
-    <fieldset disabled={disabled} className="space-y-2">
+    <fieldset disabled={disabled}>
       <legend className="sr-only">AIに送信するモデル</legend>
       <ul className="space-y-2">
         {MODEL_OPTIONS.map((opt) => {
-          const selected = opt.value === model;
+          const selected = opt.value === value;
           return (
             <li key={opt.value}>
               <label
@@ -66,7 +35,7 @@ export function ModelSelector({
                   name="model"
                   value={opt.value}
                   checked={selected}
-                  onChange={() => select(opt.value)}
+                  onChange={() => onChange(opt.value)}
                   className="mt-1 accent-accent"
                 />
                 <span className="min-w-0">
@@ -75,11 +44,6 @@ export function ModelSelector({
                     <span className="rounded-sm bg-paper px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-ink-soft">
                       コスト {opt.cost}
                     </span>
-                    {saving === opt.value && (
-                      <span className="font-mono text-[10px] text-ink-faint">
-                        保存中…
-                      </span>
-                    )}
                   </span>
                   <span className="mt-0.5 block text-xs text-ink-soft">
                     {opt.note}
@@ -90,10 +54,6 @@ export function ModelSelector({
           );
         })}
       </ul>
-      {saved && !error && (
-        <p className="font-mono text-xs text-ok">保存しました</p>
-      )}
-      {error && <p className="text-xs text-danger">{error}</p>}
     </fieldset>
   );
 }

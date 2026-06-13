@@ -3,8 +3,8 @@
 import { useEffect, useId, useRef } from "react";
 
 /**
- * 共通モーダル。背景クリック / Esc/ で閉じ、開いたらパネル内の
- * 最初のフォーカス可能要素へフォーカスを移す。
+ * 共通モーダル。背景クリック / Esc / 閉じる×ボタンで閉じ、開いたら
+ * パネル内の最初のフォーカス可能要素へフォーカスを移す。
  */
 export function Modal({
   open,
@@ -13,6 +13,7 @@ export function Modal({
   eyebrow,
   children,
   dismissible = true,
+  size = "md",
 }: {
   open: boolean;
   onClose: () => void;
@@ -21,6 +22,7 @@ export function Modal({
   children: React.ReactNode;
   /** 送信中など、閉じさせたくないときは false */
   dismissible?: boolean;
+  size?: "md" | "lg";
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -41,9 +43,11 @@ export function Modal({
 
   if (!open) return null;
 
+  const maxWidth = size === "lg" ? "max-w-2xl" : "max-w-md";
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -52,21 +56,33 @@ export function Modal({
         type="button"
         aria-label="閉じる"
         onClick={() => dismissible && onClose()}
-        className="absolute inset-0 cursor-default bg-ink/40"
+        className="fixed inset-0 cursor-default bg-ink/40"
       />
       <div
         ref={panelRef}
-        className="relative w-full max-w-md space-y-4 rounded-lg border border-line bg-surface p-6 shadow-xl"
+        className={`relative my-auto w-full ${maxWidth} space-y-4 rounded-lg border border-line bg-surface p-6 shadow-xl`}
       >
-        <div>
-          {eyebrow && (
-            <p className="font-mono text-[10px] tracking-[0.2em] text-ink-faint">
-              {eyebrow}
-            </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            {eyebrow && (
+              <p className="font-mono text-[10px] tracking-[0.2em] text-ink-faint">
+                {eyebrow}
+              </p>
+            )}
+            <h2 id={titleId} className="mt-1 text-lg font-bold">
+              {title}
+            </h2>
+          </div>
+          {dismissible && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="閉じる"
+              className="-mr-1 -mt-1 shrink-0 rounded p-1 text-xl leading-none text-ink-faint hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              ×
+            </button>
           )}
-          <h2 id={titleId} className="mt-1 text-lg font-bold">
-            {title}
-          </h2>
         </div>
         {children}
       </div>
