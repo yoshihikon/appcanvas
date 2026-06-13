@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Screen } from "@/lib/db/schema";
 import { StatusBadge } from "@/components/status-badge";
+import { CanvasToolbar } from "@/components/canvas-toolbar";
 
 const UNGROUPED = "";
 
@@ -37,6 +38,7 @@ export function Canvas({
 
   return (
     <div className="canvas-grid space-y-8 rounded-lg border border-line bg-surface/50 p-6">
+      <CanvasToolbar projectId={projectId} />
       {[...groups.entries()].map(([groupName, groupScreens]) => (
         <section key={groupName || "__ungrouped"}>
           <h2 className="mb-3 flex items-center gap-2 font-mono text-xs tracking-[0.2em] text-ink-soft">
