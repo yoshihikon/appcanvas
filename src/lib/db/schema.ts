@@ -13,6 +13,12 @@ export const projects = sqliteTable("projects", {
   persona: text("persona").notNull().default(""),
   /** 機能概要 */
   overview: text("overview").notNull().default(""),
+  /** 生成時に適用するスキルID配列（JSON文字列） */
+  skills: text("skills").notNull().default("[]"),
+  /** デザインシステムのガイドライン（自由記述） */
+  designSystem: text("design_system").notNull().default(""),
+  /** 既定の対象フォームファクタ */
+  defaultDevice: text("default_device").notNull().default("desktop"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -30,6 +36,10 @@ export const screens = sqliteTable("screens", {
   sortOrder: integer("sort_order").notNull().default(0),
   /** キャンバス上の行グルーピング（例: 認証 / メイン機能） */
   groupName: text("group_name").notNull().default(""),
+  /** フォームファクタ。サムネ比率と生成ビューポートを決める */
+  device: text("device").$type<"desktop" | "mobile">().notNull().default("desktop"),
+  /** どの生成ランで作られたか（任意） */
+  generationRunId: text("generation_run_id"),
   /** workspace 内の page.tsx 相対パス */
   codePath: text("code_path"),
   /** 静的HTMLスナップショットの相対パス */

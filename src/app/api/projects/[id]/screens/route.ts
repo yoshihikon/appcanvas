@@ -30,6 +30,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     description:
       typeof body?.description === "string" ? body.description : undefined,
     groupName: typeof body?.groupName === "string" ? body.groupName : undefined,
+    device: typeof body?.device === "string" ? body.device : undefined,
   });
   return NextResponse.json({ screen }, { status: 201 });
 }

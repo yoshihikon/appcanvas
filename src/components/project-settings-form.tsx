@@ -3,15 +3,34 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Project } from "@/lib/db/schema";
+import { AVAILABLE_SKILLS, sanitizeSkills } from "@/lib/agent/skills";
+import { DEVICE_OPTIONS } from "@/lib/device";
+
+function parseSkills(value: string): string[] {
+  try {
+    return sanitizeSkills(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}
 
 export function ProjectSettingsForm({ project }: { project: Project }) {
   const router = useRouter();
   const [name, setName] = useState(project.name);
   const [persona, setPersona] = useState(project.persona);
   const [overview, setOverview] = useState(project.overview);
+  const [skills, setSkills] = useState<string[]>(parseSkills(project.skills));
+  const [designSystem, setDesignSystem] = useState(project.designSystem);
+  const [defaultDevice, setDefaultDevice] = useState(project.defaultDevice);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function toggleSkill(id: string) {
+    setSkills((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -23,7 +42,14 @@ export function ProjectSettingsForm({ project }: { project: Project }) {
       const res = await fetch(`/api/projects/${project.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, persona, overview }),
+        body: JSON.stringify({
+          name,
+          persona,
+          overview,
+          skills,
+          designSystem,
+          defaultDevice,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -99,6 +125,81 @@ export function ProjectSettingsForm({ project }: { project: Project }) {
             className={inputClass}
           />
         </label>
+
+        <div className="border-t border-line pt-4">
+          <p className="font-mono text-[10px] tracking-[0.2em] text-ink-faint">
+            GENERATION
+          </p>
+          <p className="mt-1 text-xs text-ink-soft">
+            AIで画面を生成・修正するときの方針です（CLAUDE.md に反映されます）。
+          </p>
+        </div>
+
+        <div>
+          <span className={labelClass}>既定の対象フォームファクタ</span>
+          <div className="flex gap-2">
+            {DEVICE_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex cursor-pointer items-center gap-2 rounded border px-3 py-1.5 text-sm ${
+                  defaultDevice === opt.value
+                    ? "border-accent bg-accent-soft"
+                    : "border-line hover:border-ink-faint"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="defaultDevice"
+                  value={opt.value}
+                  checked={defaultDevice === opt.value}
+                  onChange={() => setDefaultDevice(opt.value)}
+                  className="accent-accent"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <span className={labelClass}>適用するスキル</span>
+          <ul className="space-y-1.5">
+            {AVAILABLE_SKILLS.map((skill) => (
+              <li key={skill.id}>
+                <label className="flex cursor-pointer items-start gap-2 rounded border border-line p-2 hover:border-ink-faint">
+                  <input
+                    type="checkbox"
+                    checked={skills.includes(skill.id)}
+                    onChange={() => toggleSkill(skill.id)}
+                    className="mt-0.5 accent-accent"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">
+                      {skill.label}
+                    </span>
+                    <span className="block text-xs text-ink-soft">
+                      {skill.note}
+                    </span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <label className="block">
+          <span className={labelClass}>デザインシステム（ガイドライン）</span>
+          <textarea
+            value={designSystem}
+            onChange={(e) => setDesignSystem(e.target.value)}
+            rows={5}
+            placeholder={
+              "例: 配色は青系アクセント、角丸は最小。\n見出しは太字、本文14px。余白は8pxグリッド。"
+            }
+            className={inputClass}
+          />
+        </label>
+
         <div className="flex items-center gap-3">
           <button
             type="submit"

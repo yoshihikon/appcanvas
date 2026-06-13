@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/storage/paths";
 import type { Project } from "@/lib/db/schema";
+import { sanitizeSkills, skillLabel } from "@/lib/agent/skills";
+import { deviceLabel } from "@/lib/device";
 
 /**
  * Claude Code が作業するワークスペースの骨格を作る。
@@ -19,6 +21,13 @@ export function initWorkspace(project: Project): void {
 export function writeClaudeMd(project: Project): void {
   const ws = getWorkspaceDir(project.id);
   fs.mkdirSync(ws, { recursive: true });
+
+  const skills = sanitizeSkills(safeParseArray(project.skills));
+  const skillsBlock =
+    skills.length > 0
+      ? skills.map((id) => `- ${skillLabel(id)}（${id}）`).join("\n")
+      : "（未設定）";
+
   const content = `# ${project.name} — 画面デザインワークスペース
 
 このディレクトリは AppCanvas が管理する画面デザイン用ワークスペースです。
@@ -34,6 +43,22 @@ ${project.persona || "（未設定）"}
 
 ${project.overview || "（未設定）"}
 
+## 生成方針
+
+### 既定の対象フォームファクタ
+
+${deviceLabel(project.defaultDevice)}
+
+### 適用するスキル
+
+以下のスキルがあれば読み込み、その指針に従って画面を設計してください。
+
+${skillsBlock}
+
+### デザインシステム
+
+${project.designSystem || "（未設定）"}
+
 ## 作業ルール
 
 - 画面コードは \`app/screens/<screenId>/page.tsx\` に置く（1画面=1ファイルを基本とする）
@@ -45,4 +70,12 @@ ${project.overview || "（未設定）"}
 - \`.appcanvas/\` 配下は AppCanvas が生成する派生物（サムネイル等）なので編集しない
 `;
   fs.writeFileSync(path.join(ws, "CLAUDE.md"), content);
+}
+
+function safeParseArray(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return [];
+  }
 }

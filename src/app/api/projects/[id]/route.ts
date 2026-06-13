@@ -22,7 +22,14 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
-  const patch: { name?: string; persona?: string; overview?: string } = {};
+  const patch: {
+    name?: string;
+    persona?: string;
+    overview?: string;
+    skills?: string[];
+    designSystem?: string;
+    defaultDevice?: string;
+  } = {};
   if (typeof body.name === "string") {
     const name = body.name.trim();
     if (!name) {
@@ -35,6 +42,11 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
   if (typeof body.persona === "string") patch.persona = body.persona;
   if (typeof body.overview === "string") patch.overview = body.overview;
+  if (Array.isArray(body.skills)) patch.skills = body.skills;
+  if (typeof body.designSystem === "string") patch.designSystem = body.designSystem;
+  if (body.defaultDevice === "desktop" || body.defaultDevice === "mobile") {
+    patch.defaultDevice = body.defaultDevice;
+  }
 
   const project = updateProject(id, patch);
   if (!project) {

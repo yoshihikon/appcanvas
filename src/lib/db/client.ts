@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS projects (
   name TEXT NOT NULL,
   persona TEXT NOT NULL DEFAULT '',
   overview TEXT NOT NULL DEFAULT '',
+  skills TEXT NOT NULL DEFAULT '[]',
+  design_system TEXT NOT NULL DEFAULT '',
+  default_device TEXT NOT NULL DEFAULT 'desktop',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -30,6 +33,8 @@ CREATE TABLE IF NOT EXISTS screens (
   status TEXT NOT NULL DEFAULT 'proposed',
   sort_order INTEGER NOT NULL DEFAULT 0,
   group_name TEXT NOT NULL DEFAULT '',
+  device TEXT NOT NULL DEFAULT 'desktop',
+  generation_run_id TEXT,
   code_path TEXT,
   html_path TEXT,
   thumbnail_path TEXT,
@@ -81,6 +86,29 @@ function getCache() {
   return globalCache.__appcanvasDbCache;
 }
 
+/**
+ * 既存の project.db に後から追加したカラムを補う。
+ * CREATE TABLE IF NOT EXISTS は既存テーブルを変更しないため、
+ * 列単位で存在チェックして無ければ ADD COLUMN する（冪等）。
+ */
+function migrateColumns(raw: Database.Database): void {
+  const additions: { table: string; column: string; ddl: string }[] = [
+    { table: "projects", column: "skills", ddl: "TEXT NOT NULL DEFAULT '[]'" },
+    { table: "projects", column: "design_system", ddl: "TEXT NOT NULL DEFAULT ''" },
+    { table: "projects", column: "default_device", ddl: "TEXT NOT NULL DEFAULT 'desktop'" },
+    { table: "screens", column: "device", ddl: "TEXT NOT NULL DEFAULT 'desktop'" },
+    { table: "screens", column: "generation_run_id", ddl: "TEXT" },
+  ];
+  for (const { table, column, ddl } of additions) {
+    const cols = raw
+      .prepare(`PRAGMA table_info(${table})`)
+      .all() as { name: string }[];
+    if (!cols.some((c) => c.name === column)) {
+      raw.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+    }
+  }
+}
+
 export function openProjectDb(projectId: string): ProjectDb {
   const cache = getCache();
   const cached = cache.get(projectId);
@@ -92,6 +120,7 @@ export function openProjectDb(projectId: string): ProjectDb {
   raw.pragma("journal_mode = WAL");
   raw.pragma("foreign_keys = ON");
   raw.exec(BOOTSTRAP_DDL);
+  migrateColumns(raw);
 
   const db = drizzle(raw, { schema });
   cache.set(projectId, { raw, db });

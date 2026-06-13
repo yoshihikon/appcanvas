@@ -29,6 +29,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (typeof body.description === "string") patch.description = body.description;
   if (typeof body.groupName === "string") patch.groupName = body.groupName;
   if (typeof body.sortOrder === "number") patch.sortOrder = body.sortOrder;
+  if (body.device === "desktop" || body.device === "mobile") {
+    patch.device = body.device;
+  }
 
   const screen = updateScreen(id, screenId, patch);
   if (!screen) {

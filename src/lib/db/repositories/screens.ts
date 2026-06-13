@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { openProjectDb } from "@/lib/db/client";
-import { screens, type Screen, type ScreenStatus } from "@/lib/db/schema";
+import { projects, screens, type Screen, type ScreenStatus } from "@/lib/db/schema";
+import { DEFAULT_DEVICE, isDeviceType, type DeviceType } from "@/lib/device";
 
 export function listScreens(projectId: string): Screen[] {
   const db = openProjectDb(projectId);
@@ -29,11 +30,21 @@ export function createScreen(
     description?: string;
     groupName?: string;
     status?: ScreenStatus;
+    device?: string;
   },
 ): Screen {
   const db = openProjectDb(projectId);
   const existing = listScreens(projectId);
   const maxOrder = existing.reduce((max, s) => Math.max(max, s.sortOrder), -1);
+
+  // デバイス未指定ならプロジェクト既定を採用
+  const device: DeviceType = isDeviceType(input.device)
+    ? input.device
+    : (db
+        .select({ d: projects.defaultDevice })
+        .from(projects)
+        .where(eq(projects.id, projectId))
+        .get()?.d as DeviceType | undefined) ?? DEFAULT_DEVICE;
 
   const now = new Date().toISOString();
   const screen: Screen = {
@@ -44,6 +55,8 @@ export function createScreen(
     status: input.status ?? "proposed",
     sortOrder: maxOrder + 1,
     groupName: input.groupName ?? "",
+    device,
+    generationRunId: null,
     codePath: null,
     htmlPath: null,
     thumbnailPath: null,
@@ -65,6 +78,7 @@ export function updateScreen(
       | "status"
       | "sortOrder"
       | "groupName"
+      | "device"
       | "codePath"
       | "htmlPath"
       | "thumbnailPath"

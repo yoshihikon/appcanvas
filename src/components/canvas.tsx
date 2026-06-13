@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Screen } from "@/lib/db/schema";
+import { deviceAspectClass, deviceLabel } from "@/lib/device";
 import { StatusBadge } from "@/components/status-badge";
 import { CanvasToolbar } from "@/components/canvas-toolbar";
 
@@ -81,7 +82,9 @@ function ScreenCard({
       href={`/projects/${projectId}/screens/${screen.id}`}
       className="group block overflow-hidden rounded-md border border-line bg-surface shadow-sm transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-accent"
     >
-      <div className="relative aspect-[4/3] border-b border-line bg-paper">
+      <div
+        className={`relative ${deviceAspectClass(screen.device)} border-b border-line bg-paper`}
+      >
         {screen.thumbnailPath ? (
           // サムネイル配信APIはM2のキャプチャ実装と合わせて追加する
           // eslint-disable-next-line @next/next/no-img-element
@@ -97,6 +100,9 @@ function ScreenCard({
             </span>
           </div>
         )}
+        <span className="absolute right-1.5 top-1.5 rounded-sm bg-ink/70 px-1.5 py-0.5 font-mono text-[10px] tracking-wider text-surface">
+          {deviceLabel(screen.device)}
+        </span>
       </div>
       <div className="space-y-1 p-3">
         <div className="flex items-center justify-between gap-2">

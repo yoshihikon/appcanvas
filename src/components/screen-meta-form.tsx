@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Screen } from "@/lib/db/schema";
+import { DEVICE_OPTIONS } from "@/lib/device";
 
 export function ScreenMetaForm({
   projectId,
@@ -15,6 +16,7 @@ export function ScreenMetaForm({
   const [name, setName] = useState(screen.name);
   const [description, setDescription] = useState(screen.description);
   const [groupName, setGroupName] = useState(screen.groupName);
+  const [device, setDevice] = useState(screen.device);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -29,7 +31,7 @@ export function ScreenMetaForm({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, description, groupName }),
+          body: JSON.stringify({ name, description, groupName, device }),
         },
       );
       if (res.ok) {
@@ -79,6 +81,31 @@ export function ScreenMetaForm({
           className={inputClass}
         />
       </label>
+      <div>
+        <span className={labelClass}>フォームファクタ</span>
+        <div className="flex gap-2">
+          {DEVICE_OPTIONS.map((opt) => (
+            <label
+              key={opt.value}
+              className={`flex cursor-pointer items-center gap-2 rounded border px-3 py-1.5 text-sm ${
+                device === opt.value
+                  ? "border-accent bg-accent-soft"
+                  : "border-line hover:border-ink-faint"
+              }`}
+            >
+              <input
+                type="radio"
+                name="device"
+                value={opt.value}
+                checked={device === opt.value}
+                onChange={() => setDevice(opt.value)}
+                className="accent-accent"
+              />
+              {opt.label}
+            </label>
+          ))}
+        </div>
+      </div>
       <label className="block">
         <span className={labelClass}>説明・検討メモ</span>
         <textarea
