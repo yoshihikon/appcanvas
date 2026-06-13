@@ -19,7 +19,7 @@ export class ClaudeCodeAgent implements AgentClient {
     args: ProposeArgs,
   ): Promise<{ proposal: Proposal; agentSessionId?: string }> {
     const prompt = `${proposalInstruction(args.proposalPath)}
-
+${existingScreensBlock(args.existingScreens)}
 # ユーザーの指示
 
 ${args.input || "（指示なし。前提情報から妥当な画面構成を考えてください）"}`;
@@ -39,7 +39,7 @@ ${args.input || "（指示なし。前提情報から妥当な画面構成を考
     const prompt = `現在の構成案は ${args.proposalPath} にあります（内容: ${JSON.stringify(
       args.current,
     )}）。以下の指示を反映して同じファイルを上書きしてください。スキーマは変えないこと。
-
+${existingScreensBlock(args.existingScreens)}
 # 指示
 
 ${args.instruction}`;
@@ -57,14 +57,18 @@ ${args.instruction}`;
   async generateScreen(
     args: GenerateScreenArgs,
   ): Promise<{ html: string; agentSessionId?: string }> {
-    const prompt = `次の画面のデザイン検討用プレビューを作成してください。
+    const prompt = `次の画面のデザイン検討用プレビューを${args.isUpdate ? "更新" : "作成"}してください。
 
 - 画面名: ${args.screen.name}
 - 役割: ${args.screen.description}
 - デバイス: ${args.screen.device === "mobile" ? "スマホ(幅390px想定)" : "PC(幅1440px想定)"}
 
 要件:
-- 外部依存のない自己完結HTML（インラインCSS）を ${args.previewPath} に作成する。
+${
+  args.isUpdate
+    ? `- これは既存画面の更新です。まず既存のプレビュー ${args.previewPath} を読み、デザインの一貫性を保ちつつ役割・指示に沿って修正してください（全面的に作り直さず差分で）。`
+    : `- 外部依存のない自己完結HTML（インラインCSS）を ${args.previewPath} に新規作成してください。`
+}
 - 主要要素には data-cid 属性を付与する（CLAUDE.mdの規約に従う）。
 - この工程ではNext.jsの開発コード（page.tsx等）は作らない。プレビューHTMLのみ。
 
@@ -132,13 +136,31 @@ CLAUDE.md のプロジェクト前提情報と、適用スキル・デザイン�
 {
   "screens": [
     { "key": "login", "name": "ログイン", "group": "認証",
-      "device": "desktop" | "mobile", "description": "...", "include": true }
+      "device": "desktop" | "mobile", "description": "...", "include": true,
+      "screenId": "（任意）既存画面を更新する場合のみ、その画面ID" }
   ]
 }
 
 - key は英数字ケバブケースで画面ごとに一意
+- 既存画面を作り直さず更新したい場合は、その画面の "screenId" を指定する
+- 既に十分な既存画面と重複する新規画面は作らない
 - まだコードは書かない。構成案(JSON)の作成のみ
 - ファイルを書いたら終了する`;
+}
+
+function existingScreensBlock(existing: ProposeArgs["existingScreens"]): string {
+  if (!existing || existing.length === 0) return "";
+  const lines = existing
+    .map(
+      (s) =>
+        `- screenId=${s.id} | ${s.name}（${s.device}, グループ: ${s.group || "未分類"}, 状態: ${s.status}）: ${s.description}`,
+    )
+    .join("\n");
+  return `
+# 既存の画面（更新する場合は screenId を使う）
+
+${lines}
+`;
 }
 
 function readProposal(proposalPath: string): Proposal {
@@ -155,6 +177,9 @@ function readProposal(proposalPath: string): Proposal {
       device: s.device === "mobile" ? "mobile" : "desktop",
       description: String(s.description ?? ""),
       include: s.include !== false,
+      ...(typeof s.screenId === "string" && s.screenId
+        ? { screenId: s.screenId }
+        : {}),
     })),
   };
 }

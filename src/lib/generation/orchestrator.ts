@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { getProject } from "@/lib/db/repositories/projects";
 import {
   createScreen,
+  getScreen,
   listScreens,
   updateScreen,
 } from "@/lib/db/repositories/screens";
@@ -22,6 +23,7 @@ import type { DeviceType } from "@/lib/device";
 import type {
   AgentMessage,
   DevCodeScreen,
+  ExistingScreen,
   ProjectContext,
   Proposal,
 } from "./types";
@@ -111,6 +113,18 @@ const onMessage =
   (projectId: string, runId: string) => (m: AgentMessage) =>
     emit(projectId, runId, { type: "message", role: "assistant", message: m });
 
+/** 提案時に参照させる既存画面の一覧 */
+function collectExistingScreens(projectId: string): ExistingScreen[] {
+  return listScreens(projectId).map((s) => ({
+    id: s.id,
+    name: s.name,
+    group: s.groupName,
+    device: s.device,
+    description: s.description,
+    status: s.status,
+  }));
+}
+
 /** PROPOSING を開始（非同期実行・即時return） */
 export function startProposing(projectId: string, runId: string): void {
   const c = beginOp(runId);
@@ -125,6 +139,7 @@ export function startProposing(projectId: string, runId: string): void {
         proposalPath: proposalPathFor(projectId, runId),
         input: run.input,
         context,
+        existingScreens: collectExistingScreens(projectId),
         model: readSettings().model,
         onMessage: onMessage(projectId, runId),
         abort: c.abort,
@@ -166,6 +181,7 @@ export function reviseRun(
         proposalPath: proposalPathFor(projectId, runId),
         input: run.input,
         context,
+        existingScreens: collectExistingScreens(projectId),
         model: readSettings().model,
         agentSessionId: run.agentSessionId ?? undefined,
         current,
@@ -206,14 +222,30 @@ export function approveRun(
       for (const proposed of targets) {
         if (c.abort.signal.aborted) break;
 
-        const screen = createScreen(projectId, {
-          name: proposed.name,
-          description: proposed.description,
-          groupName: proposed.group,
-          device: proposed.device,
-          status: "generating",
-        });
-        updateScreen(projectId, screen.id, { generationRunId: runId });
+        // screenId 指定があり既存画面なら「更新」、無ければ「新規作成」
+        const existing = proposed.screenId
+          ? getScreen(projectId, proposed.screenId)
+          : null;
+        const isUpdate = existing !== null;
+        const screen = existing
+          ? (updateScreen(projectId, existing.id, {
+              name: proposed.name,
+              description: proposed.description,
+              groupName: proposed.group,
+              device: proposed.device,
+              status: "generating",
+              generationRunId: runId,
+            }) ?? existing)
+          : createScreen(projectId, {
+              name: proposed.name,
+              description: proposed.description,
+              groupName: proposed.group,
+              device: proposed.device,
+              status: "generating",
+            });
+        if (!isUpdate) {
+          updateScreen(projectId, screen.id, { generationRunId: runId });
+        }
         emit(projectId, runId, {
           type: "screen",
           screenId: screen.id,
@@ -226,6 +258,7 @@ export function approveRun(
             workspace: ws,
             previewPath: path.join(ws, ".appcanvas", screen.id, "preview.html"),
             screen: { ...proposed, id: screen.id },
+            isUpdate,
             context,
             model: readSettings().model,
             agentSessionId: sessionId,

@@ -280,6 +280,15 @@ function ReviewPanel({
                 className="accent-accent"
                 aria-label="生成対象"
               />
+              <span
+                className={`shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[10px] tracking-wider ${
+                  s.screenId
+                    ? "bg-accent-soft text-accent"
+                    : "bg-ok-soft text-ok"
+                }`}
+              >
+                {s.screenId ? "更新" : "新規"}
+              </span>
               <input
                 value={s.name}
                 onChange={(e) => onUpdate(i, { name: e.target.value })}

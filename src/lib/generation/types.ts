@@ -10,9 +10,21 @@ export type ProposedScreen = {
   description: string;
   /** 生成対象に含めるか（レビューでチェックを外せる） */
   include: boolean;
+  /** 既存画面を更新する場合、その画面ID（新規作成時は未設定） */
+  screenId?: string;
 };
 
 export type Proposal = { screens: ProposedScreen[] };
+
+/** 既に存在する画面の概要（提案時に参照させる） */
+export type ExistingScreen = {
+  id: string;
+  name: string;
+  group: string;
+  device: DeviceType;
+  description: string;
+  status: string;
+};
 
 /** やりとり表示用の1イベント */
 export type AgentMessage =
@@ -35,6 +47,8 @@ export type ProposeArgs = {
   proposalPath: string;
   input: string;
   context: ProjectContext;
+  /** 既存画面（更新候補・重複回避のために参照させる） */
+  existingScreens: ExistingScreen[];
   model: string;
   onMessage: (m: AgentMessage) => void;
   abort?: AbortController;
@@ -52,6 +66,8 @@ export type GenerateScreenArgs = {
   /** プレビュー/キャプチャ用の自己完結HTMLの出力先 */
   previewPath: string;
   screen: ProposedScreen & { id: string };
+  /** 既存画面の更新か（true なら既存プレビューを読んで修正する） */
+  isUpdate: boolean;
   context: ProjectContext;
   model: string;
   agentSessionId?: string;

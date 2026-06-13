@@ -22,7 +22,17 @@ export class MockAgent implements AgentClient {
     await sleep(200);
     args.onMessage({ kind: "tool", tool: "Read", detail: "CLAUDE.md" });
     await sleep(200);
-    const proposal = buildProposal(args.input, args.context.defaultDevice);
+    if (args.existingScreens.length > 0) {
+      args.onMessage({
+        kind: "text",
+        text: `既存の${args.existingScreens.length}画面を確認しました。重複を避け、必要なら更新候補として提示します。`,
+      });
+    }
+    const proposal = buildProposal(
+      args.input,
+      args.context.defaultDevice,
+      args.existingScreens,
+    );
     args.onMessage({
       kind: "text",
       text: `${proposal.screens.length}画面の構成案を作成しました。内容を確認してください。`,
@@ -58,7 +68,10 @@ export class MockAgent implements AgentClient {
       detail: `.appcanvas/${args.screen.id}/preview.html`,
     });
     await sleep(400);
-    args.onMessage({ kind: "text", text: `「${args.screen.name}」のプレビューを生成しました。` });
+    args.onMessage({
+      kind: "text",
+      text: `「${args.screen.name}」のプレビューを${args.isUpdate ? "更新" : "生成"}しました。`,
+    });
     return { html: mockScreenHtml(args) };
   }
 
@@ -119,23 +132,42 @@ function pascal(slug: string): string {
     .join("") || "Screen";
 }
 
-function buildProposal(input: string, device: "desktop" | "mobile"): Proposal {
+function buildProposal(
+  input: string,
+  device: "desktop" | "mobile",
+  existing: ProposeArgs["existingScreens"],
+): Proposal {
   const base = [
     { key: "login", name: "ログイン", group: "認証", desc: "メール＋パスワードでログイン" },
     { key: "list", name: "一覧", group: "メイン機能", desc: "主要データの一覧表示" },
     { key: "detail", name: "詳細", group: "メイン機能", desc: "1件の詳細表示・編集" },
     { key: "settings", name: "設定", group: "その他", desc: "各種設定" },
   ];
-  return {
-    screens: base.map((b) => ({
+  const existingNames = new Set(existing.map((s) => s.name));
+
+  // 既存画面は「更新候補」として提示（既定は対象外）。同名の新規提案は重複として出さない。
+  const updates: Proposal["screens"] = existing.map((s) => ({
+    key: `update-${s.id.slice(0, 6)}`,
+    name: s.name,
+    group: s.group,
+    device: s.device,
+    description: `${s.description}（既存画面・更新候補）`,
+    include: false,
+    screenId: s.id,
+  }));
+
+  const fresh: Proposal["screens"] = base
+    .filter((b) => !existingNames.has(b.name))
+    .map((b) => ({
       key: b.key,
       name: b.name,
       group: b.group,
       device,
       description: input ? `${b.desc}（入力: ${input.slice(0, 20)}）` : b.desc,
       include: true,
-    })),
-  };
+    }));
+
+  return { screens: [...updates, ...fresh] };
 }
 
 function mockScreenHtml(args: GenerateScreenArgs): string {
