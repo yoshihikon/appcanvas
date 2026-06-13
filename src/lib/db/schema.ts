@@ -98,9 +98,50 @@ export const chatMessages = sqliteTable("chat_messages", {
   createdAt: text("created_at").notNull(),
 });
 
+export type GenerationStatus =
+  | "proposing"
+  | "reviewing"
+  | "generating"
+  | "done"
+  | "error"
+  | "canceled";
+
+/** AI画面生成ランのオーケストレーション記録（docs/AI-GENERATION.md §5） */
+export const generationRuns = sqliteTable("generation_runs", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  /** Claude Code のセッションID（resume用） */
+  agentSessionId: text("agent_session_id"),
+  status: text("status").$type<GenerationStatus>().notNull().default("proposing"),
+  /** 入力指示 */
+  input: text("input").notNull().default(""),
+  defaultDevice: text("default_device").notNull().default("desktop"),
+  /** 構成案（レビュー対象。JSON文字列） */
+  proposal: text("proposal"),
+  error: text("error"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** 生成ランのやりとり表示用メッセージ */
+export const generationMessages = sqliteTable("generation_messages", {
+  id: text("id").primaryKey(),
+  runId: text("run_id")
+    .notNull()
+    .references(() => generationRuns.id, { onDelete: "cascade" }),
+  role: text("role").$type<"user" | "assistant" | "tool" | "system">().notNull(),
+  /** 表示用ペイロード（JSON文字列） */
+  content: text("content").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export type Project = typeof projects.$inferSelect;
 export type Screen = typeof screens.$inferSelect;
 export type ScreenComponent = typeof screenComponents.$inferSelect;
 export type ProjectInput = typeof projectInputs.$inferSelect;
 export type ChatSession = typeof chatSessions.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type GenerationRun = typeof generationRuns.$inferSelect;
+export type GenerationMessage = typeof generationMessages.$inferSelect;

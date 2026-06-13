@@ -33,7 +33,7 @@ export default async function ProjectCanvasPage({
         <ProjectSettingsButton project={project} />
       </div>
 
-      <Canvas projectId={id} screens={screens} />
+      <Canvas projectId={id} screens={screens} defaultDevice={project.defaultDevice} />
     </div>
   );
 }

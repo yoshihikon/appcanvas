@@ -1,19 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Modal } from "@/components/modal";
+import { GenerationDrawer } from "@/components/generation-drawer";
+import { DEVICE_OPTIONS } from "@/lib/device";
 
 type Mode = "generate" | "import" | null;
 
 /**
  * キャンバス左上の作成起点ツールバー。
- * 「AIで画面を生成」「既存の画面を取り込み」の2つの起点を提供する。
- * 実際の生成パイプライン(M3)・取り込み処理は未実装のため、現時点では
- * 入力UIまでを用意し、送信時に準備中である旨を表示する。
+ * 「AIで画面を生成」は生成ランを開始して右ドロワーを開く。
+ * 「既存の画面を取り込み」は取り込み処理（M3以降）までのUI。
  */
-export function CanvasToolbar({ projectId }: { projectId: string }) {
+export function CanvasToolbar({
+  projectId,
+  defaultDevice,
+}: {
+  projectId: string;
+  defaultDevice: string;
+}) {
   const [mode, setMode] = useState<Mode>(null);
-  void projectId; // 生成・取り込みAPI(M3)接続時に使用
+  const [runId, setRunId] = useState<string | null>(null);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -34,43 +42,76 @@ export function CanvasToolbar({ projectId }: { projectId: string }) {
 
       <GenerateModal
         open={mode === "generate"}
+        projectId={projectId}
+        defaultDevice={defaultDevice}
         onClose={() => setMode(null)}
+        onStarted={(id) => {
+          setMode(null);
+          setRunId(id);
+        }}
       />
       <ImportModal open={mode === "import"} onClose={() => setMode(null)} />
+
+      {runId && (
+        <GenerationDrawer
+          projectId={projectId}
+          runId={runId}
+          onClose={() => setRunId(null)}
+        />
+      )}
     </div>
   );
 }
 
-const PENDING_NOTICE =
-  "入力を受け付けました。実際の処理はClaude Code連携（M3）の実装後に有効になります。";
-
 function GenerateModal({
   open,
+  projectId,
+  defaultDevice,
   onClose,
+  onStarted,
 }: {
   open: boolean;
+  projectId: string;
+  defaultDevice: string;
   onClose: () => void;
+  onStarted: (runId: string) => void;
 }) {
   const [instruction, setInstruction] = useState("");
+  const [device, setDevice] = useState(defaultDevice);
   const [files, setFiles] = useState<File[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function reset() {
     setInstruction("");
     setFiles([]);
-    setNotice(null);
+    setError(null);
   }
 
-  function handleClose() {
-    reset();
-    onClose();
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!instruction.trim() && files.length === 0) return;
-    // TODO(M3): /api/projects/[id]/screens/generate へ指示とファイルを送信
-    setNotice(PENDING_NOTICE);
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/generations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: instruction.trim(), defaultDevice: device }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "開始に失敗しました");
+        return;
+      }
+      reset();
+      onStarted(data.runId);
+    } catch {
+      setError("開始に失敗しました");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const canSubmit = instruction.trim().length > 0 || files.length > 0;
@@ -78,7 +119,8 @@ function GenerateModal({
   return (
     <Modal
       open={open}
-      onClose={handleClose}
+      onClose={onClose}
+      dismissible={!submitting}
       eyebrow="GENERATE WITH AI"
       title="AIで画面を生成"
     >
@@ -96,32 +138,56 @@ function GenerateModal({
           />
         </label>
 
+        <div>
+          <span className="mb-1 block font-mono text-[10px] tracking-wider text-ink-soft">
+            対象フォームファクタ
+          </span>
+          <div className="flex gap-2">
+            {DEVICE_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex cursor-pointer items-center gap-2 rounded border px-3 py-1.5 text-sm ${
+                  device === opt.value
+                    ? "border-accent bg-accent-soft"
+                    : "border-line hover:border-ink-faint"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="gen-device"
+                  checked={device === opt.value}
+                  onChange={() => setDevice(opt.value)}
+                  className="accent-accent"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
         <FileField
           label="ファイル添付（企画書など・任意）"
           files={files}
           onChange={setFiles}
         />
 
-        {notice && (
-          <p className="rounded bg-accent-soft px-3 py-2 text-xs text-accent">
-            {notice}
-          </p>
-        )}
+        {error && <p className="text-xs text-danger">{error}</p>}
 
         <div className="flex items-center justify-end gap-2 pt-1">
           <button
             type="button"
-            onClick={handleClose}
-            className="rounded px-3 py-2 text-sm text-ink-soft hover:bg-paper focus-visible:outline-2 focus-visible:outline-accent"
+            onClick={onClose}
+            disabled={submitting}
+            className="rounded px-3 py-2 text-sm text-ink-soft hover:bg-paper disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-accent"
           >
             キャンセル
           </button>
           <button
             type="submit"
-            disabled={!canSubmit}
+            disabled={!canSubmit || submitting}
             className="rounded bg-accent px-4 py-2 text-sm font-medium text-surface hover:bg-accent/90 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            生成
+            {submitting ? "開始中…" : "生成"}
           </button>
         </div>
       </form>
@@ -129,13 +195,7 @@ function GenerateModal({
   );
 }
 
-function ImportModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [files, setFiles] = useState<File[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -148,8 +208,8 @@ function ImportModal({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (files.length === 0) return;
-    // TODO(M2/M3): 取り込んだファイルから画面を作成する
-    setNotice(PENDING_NOTICE);
+    // TODO: 取り込んだファイルから画面を作成する
+    setNotice("入力を受け付けました。取り込み処理は今後実装されます。");
   }
 
   return (
@@ -160,18 +220,12 @@ function ImportModal({
       title="既存の画面を取り込み"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <FileField
-          label="画面ファイルを添付"
-          files={files}
-          onChange={setFiles}
-        />
-
+        <FileField label="画面ファイルを添付" files={files} onChange={setFiles} />
         {notice && (
           <p className="rounded bg-accent-soft px-3 py-2 text-xs text-accent">
             {notice}
           </p>
         )}
-
         <div className="flex items-center justify-end gap-2 pt-1">
           <button
             type="button"

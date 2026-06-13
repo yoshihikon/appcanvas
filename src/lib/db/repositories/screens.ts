@@ -79,6 +79,7 @@ export function updateScreen(
       | "sortOrder"
       | "groupName"
       | "device"
+      | "generationRunId"
       | "codePath"
       | "htmlPath"
       | "thumbnailPath"

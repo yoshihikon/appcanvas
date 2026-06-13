@@ -17,9 +17,11 @@ const UNGROUPED = "";
 export function Canvas({
   projectId,
   screens,
+  defaultDevice,
 }: {
   projectId: string;
   screens: Screen[];
+  defaultDevice: string;
 }) {
   // sortOrder昇順で渡される前提。グループの出現順を保ったまままとめる
   const groups = new Map<string, Screen[]>();
@@ -39,7 +41,7 @@ export function Canvas({
 
   return (
     <div className="canvas-grid space-y-8 rounded-lg border border-line bg-surface/50 p-6">
-      <CanvasToolbar projectId={projectId} />
+      <CanvasToolbar projectId={projectId} defaultDevice={defaultDevice} />
       {[...groups.entries()].map(([groupName, groupScreens]) => (
         <section key={groupName || "__ungrouped"}>
           <h2 className="mb-3 flex items-center gap-2 font-mono text-xs tracking-[0.2em] text-ink-soft">

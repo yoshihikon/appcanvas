@@ -1,14 +1,8 @@
 import fs from "node:fs";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { getScreen, updateScreen } from "@/lib/db/repositories/screens";
-import { replaceComponents } from "@/lib/db/repositories/screen-components";
-import { captureFromHtml } from "@/lib/capture/capture";
-import {
-  getScreenArtifactDir,
-  getSnapshotFile,
-  getThumbnailFile,
-} from "@/lib/storage/paths";
+import { captureAndStore } from "@/lib/capture/store";
+import { getSnapshotFile } from "@/lib/storage/paths";
 
 type RouteContext = { params: Promise<{ id: string; screenId: string }> };
 
@@ -41,26 +35,17 @@ export async function POST(request: Request, { params }: RouteContext) {
     );
   }
 
-  let result;
   try {
-    result = await captureFromHtml(html, screen.device);
+    const { components } = await captureAndStore({
+      projectId: id,
+      screenId,
+      html,
+      device: screen.device,
+    });
+    return NextResponse.json({ ok: true, components });
   } catch (err) {
     const message = err instanceof Error ? err.message : "キャプチャに失敗しました";
     updateScreen(id, screenId, { status: "error" });
     return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const dir = getScreenArtifactDir(id, screenId);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(getThumbnailFile(id, screenId), result.thumbnail);
-  fs.writeFileSync(getSnapshotFile(id, screenId), result.snapshotHtml);
-
-  replaceComponents(id, screenId, result.components);
-  updateScreen(id, screenId, {
-    status: "generated",
-    thumbnailPath: path.join(".appcanvas", screenId, "thumb.png"),
-    htmlPath: path.join(".appcanvas", screenId, "snapshot.html"),
-  });
-
-  return NextResponse.json({ ok: true, components: result.components });
 }

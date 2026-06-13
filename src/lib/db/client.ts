@@ -71,9 +71,30 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   content TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS generation_runs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  agent_session_id TEXT,
+  status TEXT NOT NULL DEFAULT 'proposing',
+  input TEXT NOT NULL DEFAULT '',
+  default_device TEXT NOT NULL DEFAULT 'desktop',
+  proposal TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS generation_messages (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES generation_runs(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_screens_project ON screens(project_id);
 CREATE INDEX IF NOT EXISTS idx_components_screen ON screen_components(screen_id);
 CREATE INDEX IF NOT EXISTS idx_messages_session ON chat_messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_genmsg_run ON generation_messages(run_id);
+CREATE INDEX IF NOT EXISTS idx_genruns_project ON generation_runs(project_id);
 `;
 
 // next dev のホットリロードで接続が増殖しないよう globalThis にキャッシュする
