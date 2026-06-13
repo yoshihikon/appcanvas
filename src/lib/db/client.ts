@@ -115,15 +115,33 @@ function getMigratedSet() {
 }
 
 /**
- * プロジェクトごとに1度だけマイグレーションを実行する。
- * 旧ビルドが globalThis にキャッシュした接続でも、新ビルドが最初に
- * 触れた時点でカラム追加が走るようにする（dev のホットリロード対策）。
+ * 後から追加したカラム一覧（冪等な ADD COLUMN）。
+ * ここに行を足せば、dev のホットリロード後も自動で再マイグレーションされる
+ * （下の MIGRATION_SIG が変わるため）。
+ */
+const COLUMN_ADDITIONS: { table: string; column: string; ddl: string }[] = [
+  { table: "projects", column: "skills", ddl: "TEXT NOT NULL DEFAULT '[]'" },
+  { table: "projects", column: "design_system", ddl: "TEXT NOT NULL DEFAULT ''" },
+  { table: "projects", column: "default_device", ddl: "TEXT NOT NULL DEFAULT 'desktop'" },
+  { table: "screens", column: "device", ddl: "TEXT NOT NULL DEFAULT 'desktop'" },
+  { table: "screens", column: "generation_run_id", ddl: "TEXT" },
+  { table: "generation_runs", column: "kind", ddl: "TEXT NOT NULL DEFAULT 'screens'" },
+];
+
+// 列構成のシグネチャ。列を足すと変わるので、移行済み判定が自動で無効化される。
+const MIGRATION_SIG = COLUMN_ADDITIONS.map((a) => `${a.table}.${a.column}`).join(",");
+
+/**
+ * プロジェクトごとに（列構成が変わらない限り）1度だけマイグレーションを実行する。
+ * 旧ビルドが globalThis にキャッシュした接続や移行記録でも、列を追加したビルドが
+ * 最初に触れた時点で ADD COLUMN が走るようにする（dev のホットリロード対策）。
  */
 function ensureMigrated(raw: Database.Database, projectId: string): void {
   const migrated = getMigratedSet();
-  if (migrated.has(projectId)) return;
+  const key = `${projectId}|${MIGRATION_SIG}`;
+  if (migrated.has(key)) return;
   migrateColumns(raw);
-  migrated.add(projectId);
+  migrated.add(key);
 }
 
 /**
@@ -132,15 +150,7 @@ function ensureMigrated(raw: Database.Database, projectId: string): void {
  * 列単位で存在チェックして無ければ ADD COLUMN する（冪等）。
  */
 function migrateColumns(raw: Database.Database): void {
-  const additions: { table: string; column: string; ddl: string }[] = [
-    { table: "projects", column: "skills", ddl: "TEXT NOT NULL DEFAULT '[]'" },
-    { table: "projects", column: "design_system", ddl: "TEXT NOT NULL DEFAULT ''" },
-    { table: "projects", column: "default_device", ddl: "TEXT NOT NULL DEFAULT 'desktop'" },
-    { table: "screens", column: "device", ddl: "TEXT NOT NULL DEFAULT 'desktop'" },
-    { table: "screens", column: "generation_run_id", ddl: "TEXT" },
-    { table: "generation_runs", column: "kind", ddl: "TEXT NOT NULL DEFAULT 'screens'" },
-  ];
-  for (const { table, column, ddl } of additions) {
+  for (const { table, column, ddl } of COLUMN_ADDITIONS) {
     const cols = raw
       .prepare(`PRAGMA table_info(${table})`)
       .all() as { name: string }[];
