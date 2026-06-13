@@ -27,15 +27,23 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // 開いた瞬間にだけ最初の入力欄へフォーカスする。
+  // onClose を依存に入れると毎レンダリングで再フォーカスし入力を奪うため、
+  // 依存は open のみにする。フォーカス先は×ボタンではなく入力欄を優先。
   useEffect(() => {
     if (!open) return;
     panelRef.current
       ?.querySelector<HTMLElement>(
-        'input, textarea, button, [tabindex]:not([tabindex="-1"])',
+        'input:not([type="hidden"]):not(:disabled), textarea:not(:disabled), select:not(:disabled)',
       )
       ?.focus();
+  }, [open]);
+
+  // Esc で閉じる
+  useEffect(() => {
+    if (!open || !dismissible) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && dismissible) onClose();
+      if (e.key === "Escape") onClose();
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
