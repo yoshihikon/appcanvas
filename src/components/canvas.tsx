@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Screen } from "@/lib/db/schema";
 import { deviceAspectClass, deviceLabel } from "@/lib/device";
 import { StatusBadge } from "@/components/status-badge";
@@ -10,9 +9,11 @@ import { CanvasToolbar } from "@/components/canvas-toolbar";
 
 const UNGROUPED = "";
 
+type Group = { name: string; screens: Screen[] };
+
 /**
- * プロジェクトキャンバス。
- * 自由配置はせず、グループ（行のまとまり）× 固定格子で画面を整列させる。
+ * プロジェクトの画面一覧。自由配置はせず、グループ × 固定格子で整列。
+ * サムネイルはドラッグして並び替え・別グループへの移動ができる。
  */
 export function Canvas({
   projectId,
@@ -23,76 +24,211 @@ export function Canvas({
   screens: Screen[];
   defaultDevice: string;
 }) {
-  // sortOrder昇順で渡される前提。グループの出現順を保ったまままとめる
-  const groups = new Map<string, Screen[]>();
-  for (const screen of screens) {
-    const key = screen.groupName || UNGROUPED;
-    const list = groups.get(key);
-    if (list) {
-      list.push(screen);
-    } else {
-      groups.set(key, [screen]);
-    }
-  }
-  if (groups.size === 0) groups.set(UNGROUPED, []);
+  const router = useRouter();
+  const [groups, setGroups] = useState<Group[]>(() => toGroups(screens));
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropHint, setDropHint] = useState<{ group: string; beforeId: string | null } | null>(null);
 
-  // 画面番号（SCR-xx）は全画面通しの並び順で振る
-  const numberById = new Map(screens.map((s, i) => [s.id, i + 1]));
+  // サーバー側の変更（追加・生成・削除）に追従して再構築する
+  const signature = useMemo(
+    () => screens.map((s) => `${s.id}:${s.groupName}:${s.sortOrder}`).join("|"),
+    [screens],
+  );
+  useEffect(() => {
+    setGroups(toGroups(screens));
+    // signature が変わったときだけ再構築（DnD中の自分の更新では変わらない）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+
+  const numberById = new Map(
+    groups.flatMap((g) => g.screens).map((s, i) => [s.id, i + 1]),
+  );
+
+  async function persist(next: Group[]) {
+    // sortOrder は全体通し番号で振り直す
+    let order = 0;
+    const items = next.flatMap((g) =>
+      g.screens.map((s) => ({ id: s.id, groupName: g.name, sortOrder: order++ })),
+    );
+    await fetch(`/api/projects/${projectId}/screens/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    });
+    router.refresh();
+  }
+
+  function handleDrop(targetGroup: string, beforeId: string | null) {
+    if (!draggingId) return;
+    const next = moveScreen(groups, draggingId, targetGroup, beforeId);
+    setGroups(next);
+    setDraggingId(null);
+    setDropHint(null);
+    void persist(next);
+  }
 
   return (
     <div className="canvas-grid space-y-8 rounded-lg border border-line bg-surface/50 p-6">
       <CanvasToolbar projectId={projectId} defaultDevice={defaultDevice} />
-      {[...groups.entries()].map(([groupName, groupScreens]) => (
-        <section key={groupName || "__ungrouped"}>
+
+      {groups.map((group) => (
+        <section
+          key={group.name || "__ungrouped"}
+          onDragOver={(e) => {
+            if (!draggingId) return;
+            e.preventDefault();
+            setDropHint({ group: group.name, beforeId: null });
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleDrop(group.name, dropHint?.group === group.name ? dropHint.beforeId : null);
+          }}
+        >
           <h2 className="mb-3 flex items-center gap-2 font-mono text-xs tracking-[0.2em] text-ink-soft">
             <span aria-hidden className="h-px w-4 bg-ink-faint" />
-            {groupName || "未分類"}
-            <span className="text-ink-faint">({groupScreens.length})</span>
+            {group.name || "未分類"}
+            <span className="text-ink-faint">({group.screens.length})</span>
           </h2>
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {groupScreens.map((screen) => (
-              <li key={screen.id}>
-                <ScreenCard
-                  projectId={projectId}
-                  screen={screen}
-                  number={numberById.get(screen.id) ?? 0}
-                />
-              </li>
-            ))}
+            {group.screens.map((screen) => {
+              const hinted =
+                dropHint?.group === group.name && dropHint.beforeId === screen.id;
+              return (
+                <li
+                  key={screen.id}
+                  onDragOver={(e) => {
+                    if (!draggingId) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDropHint({ group: group.name, beforeId: screen.id });
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDrop(group.name, screen.id);
+                  }}
+                  className={
+                    hinted ? "rounded-md ring-2 ring-accent ring-offset-2" : undefined
+                  }
+                >
+                  <ScreenCard
+                    projectId={projectId}
+                    screen={screen}
+                    number={numberById.get(screen.id) ?? 0}
+                    dragging={draggingId === screen.id}
+                    onDragStart={() => setDraggingId(screen.id)}
+                    onDragEnd={() => {
+                      setDraggingId(null);
+                      setDropHint(null);
+                    }}
+                  />
+                </li>
+              );
+            })}
             <li>
-              <AddScreenTile projectId={projectId} groupName={groupName} />
+              <AddScreenTile projectId={projectId} groupName={group.name} />
             </li>
           </ul>
         </section>
       ))}
+
       <NewGroupForm projectId={projectId} />
     </div>
   );
+}
+
+function toGroups(screens: Screen[]): Group[] {
+  const ordered = [...screens].toSorted((a, b) => a.sortOrder - b.sortOrder);
+  const map = new Map<string, Screen[]>();
+  for (const s of ordered) {
+    const key = s.groupName || UNGROUPED;
+    const list = map.get(key);
+    if (list) list.push(s);
+    else map.set(key, [s]);
+  }
+  if (map.size === 0) map.set(UNGROUPED, []);
+  return [...map.entries()].map(([name, list]) => ({ name, screens: list }));
+}
+
+/** dragging を targetGroup の beforeId の前（null なら末尾）へ移動した新しい groups を返す */
+function moveScreen(
+  groups: Group[],
+  draggingId: string,
+  targetGroup: string,
+  beforeId: string | null,
+): Group[] {
+  let moved: Screen | undefined;
+  let cleaned = groups.map((g) => {
+    const idx = g.screens.findIndex((s) => s.id === draggingId);
+    if (idx >= 0) {
+      moved = g.screens[idx];
+      return { ...g, screens: g.screens.filter((s) => s.id !== draggingId) };
+    }
+    return g;
+  });
+  if (!moved) return groups;
+  const movedScreen: Screen = { ...moved, groupName: targetGroup };
+
+  if (!cleaned.some((g) => g.name === targetGroup)) {
+    cleaned = [...cleaned, { name: targetGroup, screens: [] }];
+  }
+  const result = cleaned.map((g) => {
+    if (g.name !== targetGroup) return g;
+    const arr = [...g.screens];
+    const at = beforeId ? arr.findIndex((s) => s.id === beforeId) : -1;
+    arr.splice(at < 0 ? arr.length : at, 0, movedScreen);
+    return { ...g, screens: arr };
+  });
+  // 空になったグループは消す（未分類のみ空でも残す必要はない）
+  return result.filter((g) => g.screens.length > 0);
 }
 
 function ScreenCard({
   projectId,
   screen,
   number,
+  dragging,
+  onDragStart,
+  onDragEnd,
 }: {
   projectId: string;
   screen: Screen;
   number: number;
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }) {
+  const router = useRouter();
+  const href = `/projects/${projectId}/screens/${screen.id}`;
+
   return (
-    <Link
-      href={`/projects/${projectId}/screens/${screen.id}`}
-      className="group block overflow-hidden rounded-md border border-line bg-surface shadow-sm transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-accent"
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", screen.id);
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      role="link"
+      tabIndex={0}
+      onClick={() => router.push(href)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") router.push(href);
+      }}
+      className={`group block cursor-pointer overflow-hidden rounded-md border border-line bg-surface shadow-sm transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-accent ${
+        dragging ? "opacity-40" : ""
+      }`}
     >
       <div
         className={`relative ${deviceAspectClass(screen.device)} border-b border-line bg-paper`}
       >
         {screen.thumbnailPath ? (
-          // サムネイル配信APIはM2のキャプチャ実装と合わせて追加する
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={`/api/projects/${projectId}/screens/${screen.id}/thumbnail`}
             alt=""
+            draggable={false}
             className="size-full object-cover object-top"
           />
         ) : (
@@ -117,7 +253,7 @@ function ScreenCard({
           {screen.name}
         </p>
       </div>
-    </Link>
+    </div>
   );
 }
 

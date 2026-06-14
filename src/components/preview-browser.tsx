@@ -64,7 +64,7 @@ export function PreviewBrowser({
           NO SCREENS
         </p>
         <p className="mt-3 text-ink-soft">
-          まだ画面がありません。キャンバスタブで画面を生成してください。
+          まだ画面がありません。画面一覧タブで画面を生成してください。
         </p>
       </div>
     );

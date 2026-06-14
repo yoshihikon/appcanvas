@@ -108,6 +108,26 @@ export function updateScreen(
   return { ...current, ...patch, updatedAt: now };
 }
 
+/**
+ * 画面の並び順・所属グループを一括更新する（キャンバスのドラッグ操作用）。
+ * 渡された画面のみ更新する（他は不変）。
+ */
+export function reorderScreens(
+  projectId: string,
+  items: { id: string; groupName: string; sortOrder: number }[],
+): void {
+  const db = openProjectDb(projectId);
+  const now = new Date().toISOString();
+  db.transaction((tx) => {
+    for (const item of items) {
+      tx.update(screens)
+        .set({ groupName: item.groupName, sortOrder: item.sortOrder, updatedAt: now })
+        .where(and(eq(screens.projectId, projectId), eq(screens.id, item.id)))
+        .run();
+    }
+  });
+}
+
 export function deleteScreen(projectId: string, screenId: string): boolean {
   const current = getScreen(projectId, screenId);
   if (!current) return false;

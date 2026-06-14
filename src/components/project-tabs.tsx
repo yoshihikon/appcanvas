@@ -8,7 +8,7 @@ export function ProjectTabs({ id }: { id: string }) {
   const pathname = usePathname();
   const base = `/projects/${id}`;
   const tabs = [
-    { href: base, label: "キャンバス" },
+    { href: base, label: "画面一覧" },
     { href: `${base}/preview`, label: "プレビュー" },
     { href: `${base}/code`, label: "開発コード" },
   ];
